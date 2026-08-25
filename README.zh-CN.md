@@ -17,19 +17,19 @@
 安装到当前用户：
 
 ```bash
-pi install /absolute/path/to/pi-craft-tui
+pi install git:github.com/flyeric0212/pi-craft-tui
 ```
 
 只安装到当前项目：
 
 ```bash
-pi install -l /absolute/path/to/pi-craft-tui
+pi install -l git:github.com/flyeric0212/pi-craft-tui
 ```
 
 不安装、只跑一次：
 
 ```bash
-pi -e /absolute/path/to/pi-craft-tui
+pi -e git:github.com/flyeric0212/pi-craft-tui
 ```
 
 然后新开一个 Pi 会话，或执行 `/reload`。本包不会写入 `settings.json`，也不会改 `quietStartup`。

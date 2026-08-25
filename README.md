@@ -17,19 +17,19 @@ Use `pi config` to disable other TUI packages first.
 Install for your user:
 
 ```bash
-pi install /absolute/path/to/pi-craft-tui
+pi install git:github.com/flyeric0212/pi-craft-tui
 ```
 
 Or only for the current project:
 
 ```bash
-pi install -l /absolute/path/to/pi-craft-tui
+pi install -l git:github.com/flyeric0212/pi-craft-tui
 ```
 
 Try it for one run without installing:
 
 ```bash
-pi -e /absolute/path/to/pi-craft-tui
+pi -e git:github.com/flyeric0212/pi-craft-tui
 ```
 
 Then start a new Pi session or run `/reload`. This package does not write `settings.json` or set `quietStartup`.
