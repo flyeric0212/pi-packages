@@ -52,6 +52,21 @@ export function lastClearId(branch: readonly ClearBranchEntry[]): string | undef
 	return id;
 }
 
+type ClearManager = {
+	getBranch(): readonly ClearBranchEntry[];
+	getLeafId(): string | null;
+};
+
+function safeLeafId(manager: ClearManager | undefined): string | null | undefined {
+	if (!manager) return undefined;
+	try {
+		return manager.getLeafId();
+	} catch (error) {
+		if (isStaleExtensionError(error)) return undefined;
+		throw error;
+	}
+}
+
 /** Fill the viewport only for the newest clear that still sits at the branch tip. */
 export function shouldFillViewport(entryId: string, branch: readonly ClearBranchEntry[]): boolean {
 	if (lastClearId(branch) !== entryId) return false;
@@ -79,36 +94,58 @@ type ClearData = { at: number };
 
 const DESCRIPTION = "Clear the screen without deleting the session";
 
-class ClearView implements Component {
+/**
+ * The session branch is append-only: the leaf id is its fingerprint. While the
+ * leaf id, width, and terminal rows are unchanged, the fill decision and the
+ * painted lines cannot change, so reuse the last painted result instead of
+ * walking the whole branch again.
+ */
+export class ClearView implements Component {
 	private readonly entryId: string;
-	private readonly theme: { fg(color: string, text: string): string };
-	private readonly branch: () => readonly ClearBranchEntry[];
+	private readonly theme: ClearTheme;
+	private readonly manager: () => ClearManager | undefined;
+	private cachedLeafId: string | null | undefined;
+	private cachedWidth = -1;
+	private cachedRows = -1;
+	private cachedLines: string[] | undefined;
 
-	constructor(
-		entryId: string,
-		theme: { fg(color: string, text: string): string },
-		branch: () => readonly ClearBranchEntry[],
-	) {
+	constructor(entryId: string, theme: ClearTheme, manager: () => ClearManager | undefined) {
 		this.entryId = entryId;
 		this.theme = theme;
-		this.branch = branch;
+		this.manager = manager;
 	}
 
 	render(width: number): string[] {
-		return paintClear(width, {
-			fill: shouldFillViewport(this.entryId, this.branch()),
-			terminalRows: terminalRows(),
+		const leafId = safeLeafId(this.manager());
+		const rows = terminalRows();
+		if (
+			leafId !== undefined &&
+			this.cachedLeafId === leafId &&
+			this.cachedWidth === width &&
+			this.cachedRows === rows &&
+			this.cachedLines
+		) {
+			return this.cachedLines;
+		}
+		const lines = paintClear(width, {
+			fill: shouldFillViewport(this.entryId, sessionBranchOrEmpty(this.manager())),
+			terminalRows: rows,
 			theme: this.theme,
 		});
+		if (leafId !== undefined) {
+			this.cachedLeafId = leafId;
+			this.cachedWidth = width;
+			this.cachedRows = rows;
+			this.cachedLines = lines;
+		}
+		return lines;
 	}
 
 	invalidate(): void {}
 }
 
 export function installClear(pi: ExtensionAPI): void {
-	let manager: { getBranch(): readonly ClearBranchEntry[] } | undefined;
-
-	const readBranch = (): readonly ClearBranchEntry[] => sessionBranchOrEmpty(manager);
+	let manager: ClearManager | undefined;
 
 	pi.on("session_start", (_event, ctx) => {
 		manager = ctx.sessionManager;
@@ -119,7 +156,7 @@ export function installClear(pi: ExtensionAPI): void {
 	});
 
 	pi.registerEntryRenderer<ClearData>(CLS_CUSTOM_TYPE, (entry, _options, theme) => {
-		return new ClearView(entry.id, theme, readBranch);
+		return new ClearView(entry.id, theme, () => manager);
 	});
 
 	const handler = async (_args: string, ctx: ExtensionCommandContext): Promise<void> => {

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { CHROME_LEFT_PAD } from "../extensions/config.ts";
 import {
+	ClearView,
 	CLS_CHROME_ROWS,
 	CLS_CUSTOM_TYPE,
 	CLS_FALLBACK_TERMINAL_ROWS,
@@ -106,6 +107,49 @@ describe("clear session reads during reload", () => {
 			fallbackIfStale(() => "live", "ok"),
 			"live",
 		);
+	});
+});
+
+describe("clear view leaf-id caching", () => {
+	function clearBranch(): ClearBranchEntry[] {
+		return [entry("c1", "custom", CLS_CUSTOM_TYPE)];
+	}
+
+	it("reuses the painted lines while the branch tip is unchanged", () => {
+		let branchReads = 0;
+		const view = new ClearView("c1", theme, () => ({
+			getBranch: () => {
+				branchReads += 1;
+				return clearBranch();
+			},
+			getLeafId: () => "leaf-1",
+		}));
+		const first = view.render(40);
+		const second = view.render(40);
+		assert.equal(first, second);
+		assert.equal(branchReads, 1);
+	});
+
+	it("recomputes after the tip moves", () => {
+		let leafId: string | null = "leaf-1";
+		const view = new ClearView("c1", theme, () => ({
+			getBranch: () => clearBranch(),
+			getLeafId: () => leafId,
+		}));
+		const first = view.render(40);
+		leafId = "leaf-2";
+		const second = view.render(40);
+		assert.notEqual(first, second);
+	});
+
+	it("recomputes after a resize", () => {
+		const view = new ClearView("c1", theme, () => ({
+			getBranch: () => clearBranch(),
+			getLeafId: () => "leaf-1",
+		}));
+		const first = view.render(40);
+		const second = view.render(60);
+		assert.notEqual(first, second);
 	});
 });
 
