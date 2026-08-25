@@ -30,5 +30,3 @@ export const TPS_DISPLAY_MIN_MS = 1000;
 export const TPS_DISPLAY_INTERVAL_MS = 1000;
 /** Live footer ignores integer moves smaller than this; finish still publishes. */
 export const TPS_DISPLAY_HYSTERESIS = 2;
-/** Collapsed built-in tool results keep at most this many body lines. */
-export const COLLAPSED_PREVIEW_LINES = 3;
