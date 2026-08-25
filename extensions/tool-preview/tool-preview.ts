@@ -1,9 +1,9 @@
-import { createBashToolDefinition, createFindToolDefinition, createGrepToolDefinition, createLsToolDefinition, createReadToolDefinition, getAgentDir, keyHint, type ExtensionAPI, type ToolInfo, type Theme, type ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { CONFIG_DIR_NAME, createBashToolDefinition, createFindToolDefinition, createGrepToolDefinition, createLsToolDefinition, createReadToolDefinition, getAgentDir, keyHint, type ExtensionAPI, type ToolInfo, type Theme, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { Text, type Component } from "@earendil-works/pi-tui";
 import { collapsePreviewLines, formatCollapsedPreview, resultText, type PreviewTake, type PreviewTone } from "./preview.ts";
-import { paintShellCall, paintShellResult, usesReadShellBox } from "./shell.ts";
 
 export const PREVIEW_TOOL_NAMES = ["bash", "grep", "find", "ls"] as const;
 export const READ_TOOL_NAME = "read";
@@ -57,38 +57,85 @@ type BuiltInSet = {
 	read: ReturnType<typeof createReadToolDefinition>;
 };
 
-const NATIVE_CALL_SLOT = "__craftNativeCall";
 const NATIVE_RESULT_SLOT = "__craftNativeResult";
 
 const builtInCache = new Map<string, BuiltInSet>();
+
+export type ToolRuntimeSettings = {
+	shellPath?: string;
+	commandPrefix?: string;
+	autoResizeImages: boolean;
+};
 
 function readString(value: unknown): string | undefined {
 	return typeof value === "string" && value.trim().length > 0 ? value : undefined;
 }
 
-function loadBashToolOptions(): { shellPath?: string; commandPrefix?: string } {
-	const settingsPath = join(getAgentDir(), "settings.json");
-	if (!existsSync(settingsPath)) return {};
+function readBoolean(value: unknown): boolean | undefined {
+	return typeof value === "boolean" ? value : undefined;
+}
+
+/** Same leading-`~` rules as Pi's `normalizePath` (`~`, `~/`, Windows `~\`). */
+export function expandLeadingTilde(path: string, home: string = homedir()): string {
+	if (path === "~") return home;
+	if (path.startsWith("~/") || (process.platform === "win32" && path.startsWith("~\\"))) {
+		return join(home, path.slice(2));
+	}
+	return path;
+}
+
+function imageAutoResize(raw: Record<string, unknown>): boolean | undefined {
+	const images = raw.images;
+	if (typeof images !== "object" || images === null || Array.isArray(images)) return undefined;
+	return readBoolean((images as Record<string, unknown>).autoResize);
+}
+
+/** Project settings win. `autoResizeImages` defaults to true, matching Pi. */
+export function resolveToolSettings(
+	globalRaw: Record<string, unknown>,
+	projectRaw: Record<string, unknown> = {},
+	home: string = homedir(),
+): ToolRuntimeSettings {
+	const shellPath = readString(projectRaw.shellPath) ?? readString(globalRaw.shellPath);
+	const commandPrefix = readString(projectRaw.shellCommandPrefix) ?? readString(globalRaw.shellCommandPrefix);
+	return {
+		shellPath: shellPath ? expandLeadingTilde(shellPath, home) : undefined,
+		commandPrefix,
+		autoResizeImages: imageAutoResize(projectRaw) ?? imageAutoResize(globalRaw) ?? true,
+	};
+}
+
+function readJsonObject(path: string): Record<string, unknown> {
+	if (!existsSync(path)) return {};
 	try {
-		const raw = JSON.parse(readFileSync(settingsPath, "utf8")) as Record<string, unknown>;
-		return {
-			shellPath: readString(raw.shellPath),
-			commandPrefix: readString(raw.shellCommandPrefix),
-		};
+		const raw: unknown = JSON.parse(readFileSync(path, "utf8"));
+		if (typeof raw === "object" && raw !== null && !Array.isArray(raw)) return raw as Record<string, unknown>;
+		return {};
 	} catch {
 		return {};
 	}
 }
 
+function loadToolSettings(cwd: string): ToolRuntimeSettings {
+	return resolveToolSettings(
+		readJsonObject(join(getAgentDir(), "settings.json")),
+		readJsonObject(join(cwd, CONFIG_DIR_NAME, "settings.json")),
+	);
+}
+
 function builtIns(cwd: string): BuiltInSet {
 	let tools = builtInCache.get(cwd);
 	if (!tools) {
+		const settings = loadToolSettings(cwd);
 		tools = {
-			bash: createBashToolDefinition(cwd, loadBashToolOptions()),
+			bash: createBashToolDefinition(cwd, {
+				shellPath: settings.shellPath,
+				commandPrefix: settings.commandPrefix,
+			}),
 			grep: createGrepToolDefinition(cwd),
 			find: createFindToolDefinition(cwd),
 			ls: createLsToolDefinition(cwd),
-			read: createReadToolDefinition(cwd),
+			read: createReadToolDefinition(cwd, { autoResizeImages: settings.autoResizeImages }),
 		};
 		builtInCache.set(cwd, tools);
 	}
@@ -158,31 +205,11 @@ function registerPreviewTool(pi: ExtensionAPI, name: PreviewToolName, cwd: strin
 }
 
 function registerReadTool(pi: ExtensionAPI, cwd: string): void {
+	// Own the outer shell so a collapsed success stays one unboxed call line.
+	// Expanded / error use Pi's native call and result renderers.
 	pi.registerTool({
 		...withLiveExecute(builtIns(cwd).read, READ_TOOL_NAME),
 		renderShell: "self",
-		renderCall(args, theme, context) {
-			const ctx = context as RenderContext;
-			const original = builtIns(ctx.cwd).read;
-			const native = rememberNative(
-				ctx,
-				NATIVE_CALL_SLOT,
-				original.renderCall!(args as never, theme, nativeContext(ctx, NATIVE_CALL_SLOT) as never),
-			);
-			if (!usesReadShellBox(ctx)) return native;
-			return paintShellCall(native, theme, ctx);
-		},
-		renderResult(result, options, theme, context) {
-			const ctx = context as RenderContext;
-			const original = builtIns(ctx.cwd).read;
-			const native = rememberNative(
-				ctx,
-				NATIVE_RESULT_SLOT,
-				original.renderResult!(result as never, options, theme, nativeContext(ctx, NATIVE_RESULT_SLOT) as never),
-			);
-			if (!usesReadShellBox({ expanded: options.expanded, isError: ctx.isError })) return native;
-			return paintShellResult(native, theme, ctx);
-		},
 	} as AnyToolDefinition);
 }
 

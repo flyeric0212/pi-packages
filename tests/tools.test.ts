@@ -1,24 +1,23 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ToolInfo } from "@earendil-works/pi-coding-agent";
-import { Box, Text } from "@earendil-works/pi-tui";
-import { COLLAPSED_PREVIEW_LINES, TOOL_SHELL_PAD_X, TOOL_SHELL_PAD_Y } from "../extensions/config.ts";
+import { COLLAPSED_PREVIEW_LINES } from "../extensions/config.ts";
 import {
+	expandLeadingTilde,
 	isPreviewTool,
 	OVERRIDE_TOOL_NAMES,
 	PREVIEW_TOOL_NAMES,
+	resolveToolSettings,
 	shouldOverrideBuiltinPreview,
 	toolOwnerSource,
 	type PreviewToolName,
 } from "../extensions/tool-preview/tool-preview.ts";
 import {
-	argText,
 	collapsePreviewLines,
 	formatCollapsedPreview,
 	resultText,
 	splitPreviewLines,
 } from "../extensions/tool-preview/preview.ts";
-import { paintShellCall, paintShellResult, usesReadShellBox } from "../extensions/tool-preview/shell.ts";
 
 const theme = {
 	fg: (color: string, text: string) => `${color}:${text}`,
@@ -93,7 +92,7 @@ describe("collapsed preview paint", () => {
 });
 
 describe("preview sources", () => {
-	it("joins text blocks and reads string args", () => {
+	it("joins text blocks from the tool result", () => {
 		assert.equal(
 			resultText({
 				content: [
@@ -104,8 +103,6 @@ describe("preview sources", () => {
 			}),
 			"a\nb",
 		);
-		assert.equal(argText({ path: "src/a.ts", content: "hi" }, "path"), "src/a.ts");
-		assert.equal(argText({ path: 1 }, "path"), "");
 	});
 });
 
@@ -140,33 +137,43 @@ describe("builtin ownership", () => {
 	});
 });
 
-describe("compact tool shell", () => {
-	const theme = { bg: (_color: string, text: string) => text };
+describe("tool settings bridge", () => {
+	const home = "/Users/demo";
 
-	it("matches Pi's native vertical pad when a read row is boxed", () => {
-		const boxed = new Box(TOOL_SHELL_PAD_X, TOOL_SHELL_PAD_Y);
-		boxed.addChild(new Text("read a.ts", 0, 0));
-		const native = new Box(1, 1);
-		native.addChild(new Text("read a.ts", 0, 0));
-		assert.equal(TOOL_SHELL_PAD_X, 1);
-		assert.equal(TOOL_SHELL_PAD_Y, 1);
-		assert.equal(boxed.render(40).length, 3);
-		assert.equal(native.render(40).length, 3);
+	it("expands a leading tilde the same way Pi does", () => {
+		assert.equal(expandLeadingTilde("~", home), home);
+		assert.equal(expandLeadingTilde("~/.local/bin/zsh", home), "/Users/demo/.local/bin/zsh");
+		assert.equal(expandLeadingTilde("/usr/bin/zsh", home), "/usr/bin/zsh");
+		assert.equal(expandLeadingTilde("~foo/bin", home), "~foo/bin");
+		assert.equal(expandLeadingTilde("${HOME}/bin/zsh", home), "${HOME}/bin/zsh");
 	});
 
-	it("keeps call and result in one box and hides the result slot", () => {
-		const state: Record<string, unknown> = {};
-		const context = { isPartial: false, isError: false, state };
-		const shell = paintShellCall(new Text("read a.ts", 0, 0), theme, context);
-		const hidden = paintShellResult(new Text("body", 0, 0), theme, context);
-		assert.equal(hidden.render(40).length, 0);
-		assert.equal(shell.render(40).length, 4);
-		assert.equal(paintShellResult(new Text("body", 0, 0), theme, context), hidden);
+	it("lets project settings override global shellPath after tilde expansion", () => {
+		assert.deepEqual(
+			resolveToolSettings(
+				{ shellPath: "~/global/zsh", shellCommandPrefix: "global" },
+				{ shellPath: "~/project/zsh", shellCommandPrefix: "project" },
+				home,
+			),
+			{
+				shellPath: "/Users/demo/project/zsh",
+				commandPrefix: "project",
+				autoResizeImages: true,
+			},
+		);
 	});
 
-	it("skips the colored box for a collapsed successful read", () => {
-		assert.equal(usesReadShellBox({ expanded: false, isError: false }), false);
-		assert.equal(usesReadShellBox({ expanded: true, isError: false }), true);
-		assert.equal(usesReadShellBox({ expanded: false, isError: true }), true);
+	it("passes through images.autoResize false instead of the factory default", () => {
+		assert.equal(
+			resolveToolSettings({ images: { autoResize: false } }, {}, home).autoResizeImages,
+			false,
+		);
+		assert.equal(
+			resolveToolSettings({ images: { autoResize: false } }, { images: { autoResize: true } }, home)
+				.autoResizeImages,
+			true,
+		);
+		assert.equal(resolveToolSettings({}, {}, home).autoResizeImages, true);
 	});
 });
+

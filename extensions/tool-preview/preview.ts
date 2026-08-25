@@ -53,9 +53,3 @@ export function resultText(result: { content?: Array<{ type: string; text?: stri
 		.map((block) => block.text ?? "")
 		.join("\n");
 }
-
-export function argText(args: unknown, key: string): string {
-	if (!args || typeof args !== "object") return "";
-	const value = (args as Record<string, unknown>)[key];
-	return typeof value === "string" ? value : "";
-}

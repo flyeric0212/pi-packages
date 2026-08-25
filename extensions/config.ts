@@ -32,7 +32,3 @@ export const TPS_DISPLAY_INTERVAL_MS = 1000;
 export const TPS_DISPLAY_HYSTERESIS = 2;
 /** Collapsed built-in tool results keep at most this many body lines. */
 export const COLLAPSED_PREVIEW_LINES = 3;
-/** Horizontal inset when a `read` row is boxed (expand or error). Matches Pi's default Box. */
-export const TOOL_SHELL_PAD_X = 1;
-/** Vertical inset for boxed `read` only. Other tools keep Pi's native shell. */
-export const TOOL_SHELL_PAD_Y = 1;
