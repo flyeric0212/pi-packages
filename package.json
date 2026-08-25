@@ -1,0 +1,40 @@
+{
+  "name": "pi-craft-tui",
+  "version": "0.1.0",
+  "description": "Claude Code-style header, Codex-style editor and single-line footer for Pi",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "tui"
+  ],
+  "files": [
+    "extensions",
+    "assets",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "pi": {
+    "extensions": [
+      "./extensions/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.84.2",
+    "@earendil-works/pi-tui": ">=0.84.2"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.84.2",
+    "@earendil-works/pi-tui": ">=0.84.2",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0"
+  }
+}

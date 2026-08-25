@@ -1,0 +1,61 @@
+## Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+## Gradle
+.gradle
+build/
+out/
+!gradle/wrapper/gradle-wrapper.jar
+bin/
+
+## NPM
+node_modules/
+dist/
+dist-ssr
+\*.local
+
+## IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+log/
+
+## VS Code ###
+.vscode
+*.project
+*.factorypath
+
+## Mac
+.DS_Store
+*/.DS_Store
+
+## Compiled class file
+*.class
+
+## Log file
+logs/
+*.log
+*.data/
+
+## Package Files
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+## Special files
+codeGen/
+/miniprogram/node_modules/
+backup/**
+gradle.properties
+
+.codex/
+.claude/
+.antigravitycli/
+.cursor/
+.agents/
+docs/

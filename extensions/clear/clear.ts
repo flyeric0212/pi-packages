@@ -1,0 +1,132 @@
+import { CHROME_LEFT_PAD } from "../config.ts";
+import { isStaleExtensionError } from "../utils.ts";
+import { truncateToWidth, type Component } from "@earendil-works/pi-tui";
+import { type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+
+export const CLS_CUSTOM_TYPE = "craft-cls";
+export const CLS_CHROME_ROWS = 6;
+export const CLS_MIN_FILL_ROWS = 8;
+export const CLS_FALLBACK_TERMINAL_ROWS = 24;
+
+export type ClearTheme = {
+	fg(color: string, text: string): string;
+};
+
+export type ClearBranchEntry = {
+	id: string;
+	type: string;
+	customType?: string;
+};
+
+export function terminalRows(): number {
+	return process.stdout.rows ?? CLS_FALLBACK_TERMINAL_ROWS;
+}
+
+export function spacerRows(
+	rows: number,
+	chromeRows = CLS_CHROME_ROWS,
+	minRows = CLS_MIN_FILL_ROWS,
+): number {
+	const terminal = Number.isFinite(rows) ? Math.floor(rows) : CLS_FALLBACK_TERMINAL_ROWS;
+	return Math.max(minRows, Math.max(0, terminal) - chromeRows);
+}
+
+/** Live session reads used from TUI render must not throw after /reload. */
+export function sessionBranchOrEmpty(
+	manager: { getBranch(): readonly ClearBranchEntry[] } | undefined,
+): readonly ClearBranchEntry[] {
+	if (!manager) return [];
+	try {
+		return manager.getBranch();
+	} catch (error) {
+		if (isStaleExtensionError(error)) return [];
+		throw error;
+	}
+}
+
+export function lastClearId(branch: readonly ClearBranchEntry[]): string | undefined {
+	let id: string | undefined;
+	for (const entry of branch) {
+		if (entry.type === "custom" && entry.customType === CLS_CUSTOM_TYPE) id = entry.id;
+	}
+	return id;
+}
+
+/** Fill the viewport only for the newest clear that still sits at the branch tip. */
+export function shouldFillViewport(entryId: string, branch: readonly ClearBranchEntry[]): boolean {
+	if (lastClearId(branch) !== entryId) return false;
+	const index = branch.findIndex((entry) => entry.id === entryId);
+	if (index < 0) return false;
+	for (let i = index + 1; i < branch.length; i++) {
+		if (branch[i]?.type === "message") return false;
+	}
+	return true;
+}
+
+export function paintClear(
+	width: number,
+	options: { fill: boolean; terminalRows: number; theme: ClearTheme },
+): string[] {
+	const inner = Math.max(1, width - CHROME_LEFT_PAD);
+	const rule = `${" ".repeat(CHROME_LEFT_PAD)}${options.theme.fg("dim", "─".repeat(inner))}`;
+	const line = truncateToWidth(rule, Math.max(0, width), "");
+	if (!options.fill) return [line];
+	const blanks = Math.max(0, spacerRows(options.terminalRows) - 1);
+	return [line, ...Array.from({ length: blanks }, () => "")];
+}
+
+type ClearData = { at: number };
+
+const DESCRIPTION = "Clear the screen without deleting the session";
+
+class ClearView implements Component {
+	private readonly entryId: string;
+	private readonly theme: { fg(color: string, text: string): string };
+	private readonly branch: () => readonly ClearBranchEntry[];
+
+	constructor(
+		entryId: string,
+		theme: { fg(color: string, text: string): string },
+		branch: () => readonly ClearBranchEntry[],
+	) {
+		this.entryId = entryId;
+		this.theme = theme;
+		this.branch = branch;
+	}
+
+	render(width: number): string[] {
+		return paintClear(width, {
+			fill: shouldFillViewport(this.entryId, this.branch()),
+			terminalRows: terminalRows(),
+			theme: this.theme,
+		});
+	}
+
+	invalidate(): void {}
+}
+
+export function installClear(pi: ExtensionAPI): void {
+	let manager: { getBranch(): readonly ClearBranchEntry[] } | undefined;
+
+	const readBranch = (): readonly ClearBranchEntry[] => sessionBranchOrEmpty(manager);
+
+	pi.on("session_start", (_event, ctx) => {
+		manager = ctx.sessionManager;
+	});
+
+	pi.on("session_shutdown", () => {
+		manager = undefined;
+	});
+
+	pi.registerEntryRenderer<ClearData>(CLS_CUSTOM_TYPE, (entry, _options, theme) => {
+		return new ClearView(entry.id, theme, readBranch);
+	});
+
+	const handler = async (_args: string, ctx: ExtensionCommandContext): Promise<void> => {
+		if (ctx.mode !== "tui") return;
+		pi.appendEntry<ClearData>(CLS_CUSTOM_TYPE, { at: Date.now() });
+	};
+
+	pi.registerCommand("clear", { description: DESCRIPTION, handler });
+	pi.registerCommand("cls", { description: DESCRIPTION, handler });
+}
