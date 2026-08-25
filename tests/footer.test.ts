@@ -18,6 +18,7 @@ import {
 	compactProjectPath,
 } from "../extensions/utils.ts";
 import type { Theme } from "@earendil-works/pi-coding-agent";
+import { cacheHitMemoKey, contextMemoKey, Memo, readLeafFacts, type LeafFacts } from "../extensions/footer/footer.ts";
 import { FOOTER_SLOT_ORDER, fitFooter, footerSlotText, formatStatusLine, paintFooter, renderFooter } from "../extensions/footer/footer.ts";
 import { visibleWidth } from "@earendil-works/pi-tui";
 
@@ -334,5 +335,190 @@ describe("extension status line", () => {
 		assert.match(idle[0]!, /gpt-5.6-sol high/);
 		assert.ok(!idle[0]!.includes("effort"));
 		assert.ok(idle[0]!.startsWith(" "));
+	});
+});
+
+describe("footer session facts memo keys", () => {
+	function leaf(overrides: Partial<LeafFacts> = {}): LeafFacts {
+		return {
+			leafId: "leaf-1",
+			entry: { id: "leaf-1", message: { role: "assistant", content: [{ type: "text", text: "hi" }] } },
+			...overrides,
+		};
+	}
+
+	it("cache hit key ignores output growth and text growth during streaming", () => {
+		const base = leaf();
+		if (base.entry?.message) {
+			base.entry.message.usage = { input: 10, output: 50, cacheRead: 4, cacheWrite: 1 };
+		}
+		const streaming = leaf();
+		if (streaming.entry?.message) {
+			streaming.entry.message.usage = { input: 10, output: 5000, cacheRead: 4, cacheWrite: 1 };
+			streaming.entry.message.content = [{ type: "text", text: "hi there, much longer tail now" }];
+		}
+		assert.equal(cacheHitMemoKey(streaming), cacheHitMemoKey(base));
+		assert.equal(cacheHitMemoKey(undefined), undefined);
+	});
+
+	it("cache hit key changes when prompt-cache fields or the leaf change", () => {
+		const withCache = leaf();
+		if (withCache.entry?.message) {
+			withCache.entry.message.usage = { input: 10, output: 500, cacheRead: 4, cacheWrite: 1 };
+		}
+		const noCache = leaf();
+		const otherLeaf = leaf({ leafId: "leaf-2" });
+		assert.notEqual(cacheHitMemoKey(withCache), cacheHitMemoKey(noCache));
+		assert.notEqual(cacheHitMemoKey(withCache), cacheHitMemoKey(otherLeaf));
+	});
+
+	it("context key tracks output, text, and model changes", () => {
+		const base = leaf();
+		const grew = leaf();
+		if (grew.entry?.message) {
+			grew.entry.message.content = [{ type: "text", text: "hi" }, { type: "text", text: " world" }];
+		}
+		const otherModel = leaf();
+		assert.notEqual(contextMemoKey(base, "m1"), contextMemoKey(grew, "m1"));
+		assert.notEqual(contextMemoKey(base, "m1"), contextMemoKey(base, "m2"));
+		assert.equal(contextMemoKey(base, "m1"), contextMemoKey(leaf(), "m1"));
+	});
+
+	it("context key tracks thinking growth", () => {
+		const base = leaf();
+		if (base.entry?.message) {
+			base.entry.message.content = [{ type: "thinking", thinking: "short" }];
+		}
+		const grew = leaf();
+		if (grew.entry?.message) {
+			grew.entry.message.content = [
+				{ type: "thinking", thinking: "a much longer thinking chain that keeps growing while streaming" },
+			];
+		}
+		assert.notEqual(contextMemoKey(base, "m1"), contextMemoKey(grew, "m1"));
+	});
+
+	it("context key tracks toolCall argument growth", () => {
+		const base = leaf();
+		if (base.entry?.message) {
+			base.entry.message.content = [{ type: "toolCall", name: "bash", arguments: { command: "ls" } }];
+		}
+		const grew = leaf();
+		if (grew.entry?.message) {
+			grew.entry.message.content = [
+				{ type: "toolCall", name: "bash", arguments: { command: "ls -la a very long argument that keeps growing while streaming" } },
+			];
+		}
+		assert.notEqual(contextMemoKey(base, "m1"), contextMemoKey(grew, "m1"));
+	});
+
+	it("context key tracks usage reasoning and totalTokens", () => {
+		const base = leaf();
+		if (base.entry?.message) {
+			base.entry.message.usage = { input: 10, output: 5, cacheRead: 0, cacheWrite: 0, reasoning: 0, totalTokens: 15 };
+		}
+		const withReasoning = leaf();
+		if (withReasoning.entry?.message) {
+			withReasoning.entry.message.usage = { input: 10, output: 5, cacheRead: 0, cacheWrite: 0, reasoning: 500, totalTokens: 15 };
+		}
+		const withTotal = leaf();
+		if (withTotal.entry?.message) {
+			withTotal.entry.message.usage = { input: 10, output: 5, cacheRead: 0, cacheWrite: 0, reasoning: 500, totalTokens: 2000 };
+		}
+		assert.notEqual(contextMemoKey(base, "m1"), contextMemoKey(withReasoning, "m1"));
+		assert.notEqual(contextMemoKey(withReasoning, "m1"), contextMemoKey(withTotal, "m1"));
+	});
+
+	it("readLeafFacts swallows Pi's stale-ctx error", () => {
+		const stale = {
+			getLeafId() {
+				throw new Error("This extension ctx is stale after session replacement or reload.");
+			},
+			getLeafEntry() {
+				return undefined;
+			},
+		};
+		assert.equal(readLeafFacts(stale), undefined);
+		assert.equal(readLeafFacts(undefined), undefined);
+	});
+});
+
+describe("footer memo", () => {
+	it("reuses the computed value while the key is unchanged", () => {
+		const memo = new Memo<number>();
+		let computes = 0;
+		const compute = (): number => {
+			computes += 1;
+			return 42;
+		};
+		assert.equal(memo.get("a", compute), 42);
+		assert.equal(memo.get("a", compute), 42);
+		assert.equal(computes, 1);
+		assert.equal(memo.get("b", compute), 42);
+		assert.equal(computes, 2);
+	});
+
+	it("never caches when the key is undefined", () => {
+		const memo = new Memo<number>();
+		let computes = 0;
+		const compute = (): number => {
+			computes += 1;
+			return 1;
+		};
+		memo.get(undefined, compute);
+		memo.get(undefined, compute);
+		assert.equal(computes, 2);
+	});
+
+	it("caches undefined computed values while the key is unchanged", () => {
+		const memo = new Memo<number | undefined>();
+		let computes = 0;
+		const compute = (): number | undefined => {
+			computes += 1;
+			return undefined;
+		};
+		memo.get("a", compute);
+		memo.get("a", compute);
+		assert.equal(computes, 1);
+	});
+});
+
+describe("footer render frames reuse the branch scan", () => {
+	it("keeps getBranch out of streaming frames whose facts did not change", () => {
+		let branchScans = 0;
+		const manager = {
+			getLeafId: () => "leaf-1",
+			getLeafEntry: () => ({
+				id: "leaf-1",
+				message: {
+					role: "assistant" as const,
+					usage: { input: 10, output: 50, cacheRead: 4, cacheWrite: 1 },
+					content: [{ type: "text", text: "growing text" }],
+				},
+			}),
+			getBranch: () => {
+				branchScans += 1;
+				return [
+					{
+						id: "leaf-1",
+						type: "message" as const,
+						message: { role: "assistant", usage: { input: 10, output: 50, cacheRead: 4, cacheWrite: 1 } },
+					},
+				];
+			},
+		};
+		const cacheHitMemo = new Memo<number | null>();
+		const contextMemo = new Memo<{ tokens: number; percent: number } | undefined>();
+		const renderFrame = (): void => {
+			const leafFacts = readLeafFacts(manager);
+			cacheHitMemo.get(cacheHitMemoKey(leafFacts), () =>
+				cumulativeCacheHitRate(assistantCacheUsages(manager.getBranch())),
+			);
+			contextMemo.get(contextMemoKey(leafFacts, "m1"), () => ({ tokens: 100, percent: 25 }));
+		};
+		renderFrame();
+		renderFrame();
+		renderFrame();
+		assert.equal(branchScans, 1);
 	});
 });

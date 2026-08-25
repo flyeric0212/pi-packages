@@ -7,12 +7,14 @@ import {
 	contextTone,
 	ellipsizeMiddle,
 	fallbackIfStale,
+	finiteOrZero,
 	formatCacheHit,
 	formatContextUsage,
 	formatFooterModelThinking,
 	formatHomePath,
 	formatTps,
 	internLines,
+	isStaleExtensionError,
 	cumulativeCacheHitRate,
 	modelLabel,
 	paintFooterModelThinking,
@@ -35,6 +37,141 @@ export type FooterFields = {
 	tps: number | null;
 	cacheHit: number | null;
 };
+
+type LeafMessage = {
+	role?: string;
+	usage?: {
+		input?: number;
+		output?: number;
+		cacheRead?: number;
+		cacheWrite?: number;
+		reasoning?: number;
+		totalTokens?: number;
+	};
+	content?: unknown;
+};
+
+export type LeafFacts = {
+	leafId: string | null;
+	entry?: { id?: string; message?: LeafMessage };
+};
+
+type LeafManager = {
+	getLeafId(): string | null;
+	getLeafEntry(): { id?: string; message?: LeafMessage } | undefined;
+};
+
+/**
+ * The session branch is append-only: the leaf id plus the streaming tail's own
+ * state fingerprint what the expensive branch facts (`getContextUsage`, the
+ * cumulative cache-hit scan) can possibly depend on. Same as the clear view's
+ * leaf-id memo, but the tail fingerprint also covers in-place growth of the
+ * message currently streaming.
+ */
+export function readLeafFacts(manager: LeafManager | undefined): LeafFacts | undefined {
+	if (!manager) return undefined;
+	try {
+		return { leafId: manager.getLeafId(), entry: manager.getLeafEntry() };
+	} catch (error) {
+		if (isStaleExtensionError(error)) return undefined;
+		throw error;
+	}
+}
+
+function usageValues(usage: LeafMessage["usage"]): string {
+	if (!usage) return "none";
+	return [
+		finiteOrZero(usage.input),
+		finiteOrZero(usage.output),
+		finiteOrZero(usage.cacheRead),
+		finiteOrZero(usage.cacheWrite),
+		finiteOrZero(usage.reasoning),
+		finiteOrZero(usage.totalTokens),
+	].join(":");
+}
+
+/**
+ * Chars in the leaf content that Pi's `estimateTokens` counts for an assistant
+ * tail: text, thinking, and toolCall name + serialized arguments. The context
+ * estimate is `ceil(chars / 4)`, so same chars ⇒ same estimate; any tail growth
+ * (including thinking and tool calls) must change this value.
+ */
+export function tailEstimateChars(content: unknown): number {
+	if (!Array.isArray(content)) return 0;
+	let chars = 0;
+	for (const block of content) {
+		if (block == null || typeof block !== "object") continue;
+		const any = block as Record<string, unknown>;
+		if (any.type === "text" && typeof any.text === "string") {
+			chars += any.text.length;
+		} else if (any.type === "thinking" && typeof any.thinking === "string") {
+			chars += any.thinking.length;
+		} else if (any.type === "toolCall") {
+			if (typeof any.name === "string") chars += any.name.length;
+			if (any.arguments !== undefined) {
+				try {
+					const serialized = JSON.stringify(any.arguments);
+					if (serialized) chars += serialized.length;
+				} catch {
+					// Non-serializable arguments: nothing safe to count.
+				}
+			}
+		}
+	}
+	return chars;
+}
+
+/**
+ * Cache-hit rate depends only on the branch shape and the prompt-cache fields
+ * of the streaming tail. Output tokens and text growth do not change it, so
+ * streaming frames hit the memo instead of rescanning the branch.
+ */
+export function cacheHitMemoKey(facts: LeafFacts | undefined): string | undefined {
+	if (!facts) return undefined;
+	const usage = facts.entry?.message?.usage;
+	const key = [facts.leafId ?? "", usage ? finiteOrZero(usage.input) : "", usage ? finiteOrZero(usage.cacheRead) : "", usage ? finiteOrZero(usage.cacheWrite) : ""].join("|");
+	return key;
+}
+
+/**
+ * Context estimate depends on the whole tail: model, usage (all fields the
+ * estimate reads, including reasoning and totalTokens), and every char Pi's
+ * `estimateTokens` would count (text, thinking, toolCall). Any tail growth
+ * must change this key.
+ */
+export function contextMemoKey(facts: LeafFacts | undefined, modelId: string | undefined): string | undefined {
+	if (!facts) return undefined;
+	const message = facts.entry?.message;
+	const usage = message?.usage;
+	const key = [
+		facts.leafId ?? "",
+		modelId ?? "",
+		message?.role ?? "",
+		usage ? usageValues(usage) : "none",
+		tailEstimateChars(message?.content),
+	].join("|");
+	return key;
+}
+
+/**
+ * Value memo keyed by an optional fingerprint; `undefined` key never caches.
+ * A computed `undefined` value is still cached (a fingerprint match means the
+ * value cannot have changed, whatever it is).
+ */
+export class Memo<T> {
+	private key: string | undefined;
+	private hasValue = false;
+	private value: T | undefined;
+
+	get(key: string | undefined, compute: () => T): T {
+		if (key !== undefined && this.hasValue && this.key === key) return this.value as T;
+		const next = compute();
+		this.key = key;
+		this.value = next;
+		this.hasValue = true;
+		return next;
+	}
+}
 
 export type FittedFooter = {
 	model: string;
@@ -179,6 +316,8 @@ export function paintFooter(fitted: FittedFooter, theme: Theme): string {
 export function installFooter(ctx: ExtensionContext, store: CraftStore): void {
 	ctx.ui.setFooter((tui, _theme, footerData) => {
 		const cache: { lines?: string[] } = {};
+		const cacheHitMemo = new Memo<number | null>();
+		const contextMemo = new Memo<ReturnType<ExtensionContext["getContextUsage"]>>();
 		const unsubscribe = store.subscribe(() => tui.requestRender());
 		return {
 			dispose: unsubscribe,
@@ -190,7 +329,12 @@ export function installFooter(ctx: ExtensionContext, store: CraftStore): void {
 					cache,
 					fallbackIfStale(() => {
 						const snap = store.snapshot;
-						const usage = ctx.getContextUsage();
+						const leaf = readLeafFacts(ctx.sessionManager);
+						const cacheHit = cacheHitMemo.get(
+							cacheHitMemoKey(leaf),
+							() => cumulativeCacheHitRate(assistantCacheUsages(ctx.sessionManager.getBranch())),
+						);
+						const usage = contextMemo.get(contextMemoKey(leaf, ctx.model?.id), () => ctx.getContextUsage());
 						return renderFooter(
 							{
 								modelName: ctx.model?.name ?? snap.modelName,
@@ -201,7 +345,7 @@ export function installFooter(ctx: ExtensionContext, store: CraftStore): void {
 								percent: usage?.percent ?? null,
 								cwd: ctx.cwd || snap.cwd,
 								tps: snap.tps.tps,
-								cacheHit: cumulativeCacheHitRate(assistantCacheUsages(ctx.sessionManager.getBranch())),
+								cacheHit,
 							},
 							[...footerData.getExtensionStatuses().values()],
 							width,

@@ -39,7 +39,7 @@ export function contextTone(percent: number | null): ContextTone {
 	return "success";
 }
 
-function finiteOrZero(n: unknown): number {
+export function finiteOrZero(n: unknown): number {
 	return typeof n === "number" && Number.isFinite(n) ? n : 0;
 }
 
