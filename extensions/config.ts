@@ -8,7 +8,7 @@ export const LOGO_TEXT_GAP = 3;
 export const HEADER_PAD_Y = 1;
 export const CONTEXT_WARN_PERCENT = 70;
 export const CONTEXT_DANGER_PERCENT = 90;
-/** Cache hit rate at or above this is painted success. Below it is warning. */
+/** Cache hit rate at or above this is painted syntaxKeyword (reuse/hit). Below it is warning. */
 export const CACHE_HIT_WARN_PERCENT = 70;
 /** Cache hit rate below this is painted error. */
 export const CACHE_HIT_DANGER_PERCENT = 30;

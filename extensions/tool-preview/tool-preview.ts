@@ -1,22 +1,9 @@
 import { createBashToolDefinition, createFindToolDefinition, createGrepToolDefinition, createLsToolDefinition, createReadToolDefinition, getAgentDir, keyHint, type ExtensionAPI, type ToolInfo, type Theme, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { Container, Text, type Component } from "@earendil-works/pi-tui";
+import { Text, type Component } from "@earendil-works/pi-tui";
 import { collapsePreviewLines, formatCollapsedPreview, resultText, type PreviewTake, type PreviewTone } from "./preview.ts";
 import { paintShellCall, paintShellResult, usesReadShellBox } from "./shell.ts";
-import {
-	assignReadRole,
-	collectReadResults,
-	contentHasImage,
-	formatGroupedReadCall,
-	readArgPath,
-	readCallsAround,
-	type BranchEntry,
-	type LiveRead,
-	type ReadAssignment,
-	type ReadCallRef,
-	type ReadResultFact,
-} from "./group.ts";
 
 export const PREVIEW_TOOL_NAMES = ["bash", "grep", "find", "ls"] as const;
 export const READ_TOOL_NAME = "read";
@@ -72,9 +59,6 @@ type BuiltInSet = {
 
 const NATIVE_CALL_SLOT = "__craftNativeCall";
 const NATIVE_RESULT_SLOT = "__craftNativeResult";
-const EMPTY_SLOT = "__craftEmpty";
-const GROUP_CALL_SLOT = "__craftGroupCall";
-const GROUP_TOKEN_SLOT = "__craftGroupToken";
 
 const builtInCache = new Map<string, BuiltInSet>();
 
@@ -173,72 +157,7 @@ function registerPreviewTool(pi: ExtensionAPI, name: PreviewToolName, cwd: strin
 	} as AnyToolDefinition);
 }
 
-type BranchReader = () => readonly BranchEntry[];
-
-function emptySlot(context: RenderContext): Component {
-	const existing = slotComponent(context, EMPTY_SLOT);
-	if (existing instanceof Container) return existing;
-	return rememberNative(context, EMPTY_SLOT, new Container());
-}
-
-function groupedCall(paths: readonly string[], theme: Theme, context: RenderContext): Component {
-	const existing = slotComponent(context, GROUP_CALL_SLOT);
-	const view = existing instanceof Text ? existing : new Text("", 0, 0);
-	view.setText(formatGroupedReadCall(paths, theme));
-	return rememberNative(context, GROUP_CALL_SLOT, view);
-}
-
-function liveRead(context: RenderContext, hasImage: boolean): LiveRead {
-	return {
-		id: context.toolCallId ?? "",
-		expanded: context.expanded,
-		isPartial: context.isPartial,
-		isError: context.isError,
-		hasImage,
-	};
-}
-
-const settledReads = new Map<string, ReadResultFact>();
-const liveCalls = new Map<string, ReadCallRef>();
-
-function noteCall(id: string | undefined, path: string): void {
-	if (!id) return;
-	liveCalls.set(id, { id, path, read: path.length > 0 });
-}
-
-function noteSettled(id: string | undefined, fact: ReadResultFact | undefined): void {
-	if (!id) return;
-	if (!fact) settledReads.delete(id);
-	else settledReads.set(id, fact);
-}
-
-function resultsFor(entries: readonly BranchEntry[]): Map<string, ReadResultFact> {
-	const results = new Map(collectReadResults(entries));
-	for (const [id, fact] of settledReads) {
-		if (!results.has(id)) results.set(id, fact);
-	}
-	return results;
-}
-
-function assignCurrentRead(
-	getBranch: BranchReader,
-	context: RenderContext,
-	args: unknown,
-	hasImage: boolean,
-): ReadAssignment {
-	const live = liveRead(context, hasImage);
-	const path = readArgPath(args);
-	noteCall(live.id, path);
-	if (live.isPartial) noteSettled(live.id, undefined);
-	else if (live.id) noteSettled(live.id, { isError: live.isError, hasImage: live.hasImage });
-	if (!live.id) {
-		return { role: "standalone", leaderId: "", ids: [], paths: path ? [path] : [] };
-	}
-	const entries = safeBranch(getBranch);
-	return assignReadRole(readCallsAround(entries, live.id, [...liveCalls.values()]), resultsFor(entries), live);
-}
-
-function registerReadTool(pi: ExtensionAPI, cwd: string, getBranch: BranchReader, invalidators: Map<string, () => void>): void {
+function registerReadTool(pi: ExtensionAPI, cwd: string): void {
 	pi.registerTool({
 		...withLiveExecute(builtIns(cwd).read, READ_TOOL_NAME),
 		renderShell: "self",
@@ -250,12 +169,6 @@ function registerReadTool(pi: ExtensionAPI, cwd: string, getBranch: BranchReader
 				NATIVE_CALL_SLOT,
 				original.renderCall!(args as never, theme, nativeContext(ctx, NATIVE_CALL_SLOT) as never),
 			);
-			if (ctx.toolCallId) invalidators.set(ctx.toolCallId, ctx.invalidate);
-			const hasImage = collectReadResults(safeBranch(getBranch)).get(ctx.toolCallId ?? "")?.hasImage ?? false;
-			const assignment = assignCurrentRead(getBranch, ctx, args, hasImage);
-			notifyGroup(ctx, assignment, invalidators);
-			if (assignment.role === "follower") return emptySlot(ctx);
-			if (assignment.role === "leader") return groupedCall(assignment.paths, theme, ctx);
 			if (!usesReadShellBox(ctx)) return native;
 			return paintShellCall(native, theme, ctx);
 		},
@@ -267,45 +180,14 @@ function registerReadTool(pi: ExtensionAPI, cwd: string, getBranch: BranchReader
 				NATIVE_RESULT_SLOT,
 				original.renderResult!(result as never, options, theme, nativeContext(ctx, NATIVE_RESULT_SLOT) as never),
 			);
-			if (ctx.toolCallId) invalidators.set(ctx.toolCallId, ctx.invalidate);
-			const assignment = assignCurrentRead(getBranch, ctx, ctx.args, contentHasImage(result?.content));
-			notifyGroup(ctx, assignment, invalidators);
-			if (assignment.role === "follower") return emptySlot(ctx);
 			if (!usesReadShellBox({ expanded: options.expanded, isError: ctx.isError })) return native;
 			return paintShellResult(native, theme, ctx);
 		},
 	} as AnyToolDefinition);
 }
 
-function safeBranch(getBranch: BranchReader): readonly BranchEntry[] {
-	try {
-		return getBranch();
-	} catch {
-		return [];
-	}
-}
-
-function notifyGroup(
-	context: RenderContext,
-	assignment: ReadAssignment,
-	invalidators: Map<string, () => void>,
-): void {
-	const self = context.toolCallId ?? "";
-	const token = `${assignment.role}:${assignment.leaderId}:${assignment.ids.join(",")}`;
-	if (context.state[GROUP_TOKEN_SLOT] === token) return;
-	context.state[GROUP_TOKEN_SLOT] = token;
-	if (assignment.role === "standalone" || assignment.ids.length < 2) return;
-	const targets = assignment.role === "leader" ? assignment.ids : [assignment.leaderId];
-	for (const id of targets) {
-		if (!id || id === self) continue;
-		invalidators.get(id)?.();
-	}
-}
-
 export function installToolPreview(pi: ExtensionAPI): void {
 	const installed = new Set<BuiltinName>();
-	const invalidators = new Map<string, () => void>();
-	let getBranch: BranchReader = () => [];
 
 	const install = (cwd: string): void => {
 		for (const name of listOverridableTools(pi, PREVIEW_TOOL_NAMES)) {
@@ -317,21 +199,13 @@ export function installToolPreview(pi: ExtensionAPI): void {
 			!installed.has(READ_TOOL_NAME) &&
 			listOverridableTools(pi, [READ_TOOL_NAME]).includes(READ_TOOL_NAME)
 		) {
-			registerReadTool(pi, cwd, () => getBranch(), invalidators);
+			registerReadTool(pi, cwd);
 			installed.add(READ_TOOL_NAME);
 		}
 	};
 
 	pi.on("session_start", (_event, ctx) => {
 		if (ctx.mode !== "tui") return;
-		getBranch = () => ctx.sessionManager.getBranch() as readonly BranchEntry[];
 		install(ctx.cwd);
-	});
-
-	pi.on("session_shutdown", () => {
-		getBranch = () => [];
-		invalidators.clear();
-		settledReads.clear();
-		liveCalls.clear();
 	});
 }

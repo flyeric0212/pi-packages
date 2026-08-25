@@ -38,7 +38,7 @@ Then start a new Pi session or run `/reload`. This package does not write `setti
 - `/clear` and `/cls` clear the screen only; history, `/tree`, and model context stay
 - `/skill-name` runs a loaded skill (same as `/skill:skill-name`)
 - Slash commands: the command name uses the theme accent; Enter completes a partial pick and only submits when the typed name already matches
-- Collapsed `grep` / `find` / `ls` / `bash` keep at most three result lines; consecutive collapsed successful `read`s stack into one list; a single `read` stays one unboxed line; `write` and `edit` stay native; `Ctrl+O` expands to Pi's renderer
+- Collapsed `grep` / `find` / `ls` / `bash` keep at most three result lines; a collapsed successful `read` stays one unboxed line; `write` and `edit` stay native; `Ctrl+O` expands to Pi's renderer
 - Tool preview re-registers `read`, `bash`, `grep`, `find`, and `ls` only while those names are still owned by Pi. After upgrading Pi, re-check collapsed and expanded output for those five tools.
 
 ## License

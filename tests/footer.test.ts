@@ -42,7 +42,7 @@ describe("token and context formatting", () => {
 
 	it("maps context percent to tone thresholds", () => {
 		assert.equal(contextTone(null), "text");
-		assert.equal(contextTone(69.9), "text");
+		assert.equal(contextTone(69.9), "success");
 		assert.equal(contextTone(70), "warning");
 		assert.equal(contextTone(90), "error");
 	});
@@ -104,12 +104,12 @@ describe("cache hit rate", () => {
 		assert.equal(formatCacheHit(0), "CH0.0%");
 	});
 
-	it("maps cache hit to success, warning, and error", () => {
+	it("maps cache hit to syntaxKeyword, warning, and error", () => {
 		assert.equal(cacheHitTone(null), undefined);
 		assert.equal(cacheHitTone(29.9), "error");
 		assert.equal(cacheHitTone(30), "warning");
 		assert.equal(cacheHitTone(69.9), "warning");
-		assert.equal(cacheHitTone(70), "success");
+		assert.equal(cacheHitTone(70), "syntaxKeyword");
 	});
 });
 
@@ -153,6 +153,7 @@ describe("model and thinking", () => {
 			paintFooterModelThinking("DeepSeek V4 Flash", "max", theme),
 			"[text]DeepSeek V4 Flash [thinkingMax]max",
 		);
+		assert.equal(paintFooterModelThinking("DeepSeek V4 Flash", "off", theme), "[text]DeepSeek V4 Flash");
 	});
 });
 
@@ -194,13 +195,13 @@ describe("footer fit", () => {
 		assert.equal(fitted.cwd, "~/Code/project");
 		assert.equal(fitted.tps, "42 tok/s");
 		assert.equal(fitted.cache, undefined);
-		assert.equal(fitted.tone, "text");
+		assert.equal(fitted.tone, "success");
 	});
 
 	it("appends cache hit after tps and hides it when there is no cache", () => {
 		const withCache = fitFooter({ ...base, cacheHit: 87.34 }, 120, "/Users/eric");
 		assert.equal(withCache.cache, "CH87.3%");
-		assert.equal(withCache.cacheTone, "success");
+		assert.equal(withCache.cacheTone, "syntaxKeyword");
 		const line = [
 			formatFooterModelThinking(withCache.model, withCache.thinking),
 			withCache.context,
@@ -269,12 +270,13 @@ describe("footer fit", () => {
 		assert.equal(fitFooter({ ...base, percent: 90 }, 80, "/Users/eric").tone, "error");
 	});
 
-	it("paints context and cwd in the readable text color", () => {
+	it("paints model, context, and path readable, and tps accent", () => {
 		const theme = {
 			fg: (color: string, text: string) => `[${color}]${text}`,
 		} as Theme;
 		const painted = paintFooter(fitFooter(base, 120, "/Users/eric"), theme);
-		assert.match(painted, /\[text\]126k\/400k/);
+		assert.match(painted, /\[text\]gpt-5\.6-sol \[thinkingHigh\]high/);
+		assert.match(painted, /\[success\]126k\/400k/);
 		assert.match(painted, /\[text\]~\/Code\/project/);
 		assert.match(painted, /\[accent\]42 tok\/s/);
 		assert.ok(!painted.includes("CH"));
@@ -285,7 +287,7 @@ describe("footer fit", () => {
 			fg: (color: string, text: string) => `[${color}]${text}`,
 		} as Theme;
 		const painted = paintFooter(fitFooter({ ...base, cacheHit: 87.3 }, 120, "/Users/eric"), theme);
-		assert.match(painted, /\[accent\]42 tok\/s.*\[success\]CH87\.3%/);
+		assert.match(painted, /\[accent\]42 tok\/s.*\[syntaxKeyword\]CH87\.3%/);
 		const low = paintFooter(fitFooter({ ...base, cacheHit: 12 }, 120, "/Users/eric"), theme);
 		assert.match(low, /\[error\]CH12\.0%/);
 	});

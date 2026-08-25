@@ -47,6 +47,7 @@ export type FittedFooter = {
 	cacheTone: CacheTone | undefined;
 };
 
+/** `modelThinking` is one slot (`model high`); do not split it with the line separator. */
 export const FOOTER_SLOT_ORDER = ["modelThinking", "context", "cwd", "tps", "cache"] as const;
 export type FooterSlotId = (typeof FOOTER_SLOT_ORDER)[number];
 

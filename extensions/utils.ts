@@ -9,8 +9,8 @@ import {
 	UNKNOWN,
 } from "./config.ts";
 
-export type ContextTone = "text" | "warning" | "error";
-export type CacheTone = "success" | "warning" | "error";
+export type ContextTone = "text" | "success" | "warning" | "error";
+export type CacheTone = "syntaxKeyword" | "warning" | "error";
 
 export type PromptCacheUsage = {
 	input?: number;
@@ -36,7 +36,7 @@ export function contextTone(percent: number | null): ContextTone {
 	if (percent == null || !Number.isFinite(percent)) return "text";
 	if (percent >= CONTEXT_DANGER_PERCENT) return "error";
 	if (percent >= CONTEXT_WARN_PERCENT) return "warning";
-	return "text";
+	return "success";
 }
 
 function finiteOrZero(n: unknown): number {
@@ -96,7 +96,7 @@ export function cacheHitTone(rate: number | null): CacheTone | undefined {
 	if (rate == null || !Number.isFinite(rate)) return undefined;
 	if (rate < CACHE_HIT_DANGER_PERCENT) return "error";
 	if (rate < CACHE_HIT_WARN_PERCENT) return "warning";
-	return "success";
+	return "syntaxKeyword";
 }
 
 export function formatHomePath(cwd: string, home = homedir()): string {
@@ -184,7 +184,7 @@ export function formatModelThinking(model: string, thinking: string | undefined)
 	return `${model} · ${effort}`;
 }
 
-/** Footer: `model max` — space only, no effort label. */
+/** Footer: `model max` — one slot, space only. Never use ` · `; that separates slots. */
 export function formatFooterModelThinking(model: string, thinking: string | undefined): string {
 	const label = thinkingLevelLabel(thinking);
 	if (!label) return model;
