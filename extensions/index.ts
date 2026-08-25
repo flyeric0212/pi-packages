@@ -5,6 +5,7 @@ import { installFooter } from "./footer/footer.ts";
 import { installHeader } from "./header/header.ts";
 import { installSkillShortcuts } from "./skill-shortcuts/skill-shortcuts.ts";
 import { installToolPreview } from "./tool-preview/tool-preview.ts";
+import { buildSkillCatalog, type SkillCatalog } from "./catalog.ts";
 import { CraftStore } from "./state.ts";
 import {
 	displayedTps,
@@ -30,9 +31,17 @@ export default function (pi: ExtensionAPI): void {
 	const store = new CraftStore({ version: VERSION });
 	const tps = new TokenSpeedEngine();
 	let installed = false;
+	let skillCatalog: SkillCatalog | undefined;
+
+	/**
+	 * Commands and skills are static within a session, so build once per
+	 * session. Built lazily on first use — after session setup finished,
+	 * which also covers skills other extensions contribute at session start.
+	 */
+	const getSkillCatalog = (): SkillCatalog => skillCatalog ?? (skillCatalog = buildSkillCatalog(pi.getCommands()));
 
 	installClear(pi);
-	installSkillShortcuts(pi);
+	installSkillShortcuts(pi, getSkillCatalog);
 	installToolPreview(pi);
 
 	pi.registerMarkdownTransformer((markdown, { messageType }) => {
@@ -53,15 +62,19 @@ export default function (pi: ExtensionAPI): void {
 
 	pi.on("session_start", (event, ctx) => {
 		if (!isTui(ctx)) return;
+		// Drop any cached catalog (possibly built outside this session); the
+		// next use rebuilds it after the session has been fully set up.
+		skillCatalog = undefined;
 		syncFrom(ctx);
 		installHeader(ctx, pi, event.reason === "startup");
-		installEditor(ctx, pi);
+		installEditor(ctx, pi, getSkillCatalog);
 		installFooter(ctx, store);
 		installed = true;
 	});
 
 	pi.on("session_shutdown", (_event, ctx) => {
 		tps.reset();
+		skillCatalog = undefined;
 		if (isTui(ctx) && installed) {
 			ctx.ui.setHeader(undefined);
 			ctx.ui.setEditorComponent(undefined);

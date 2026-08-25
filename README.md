@@ -33,12 +33,12 @@ Then start a new Pi session or run `/reload`. This package does not write `setti
 ## Features
 
 - Header: animated Pi logo (once per new process), version, slogan, model, thinking effort, and project directory
-- Editor: Codex-style filled input with a bold `❯`; send, steer, queue, history, `/`, `@`, and bash stay native
+- Editor: Codex-style filled input with a bold `❯`
 - Footer: `model high · 126k/400k · cwd · tok/s · CH87.3%`; cache hit is the branch-cumulative rate, last, and hidden until a cache read; other extensions' `setStatus()` text appears on the line above
-- `/clear` and `/cls` clear the screen only; history, `/tree`, and model context stay
+- `/clear` and `/cls` clear the screen only
 - `/skill-name` runs a loaded skill (same as `/skill:skill-name`)
 - Slash commands: the command name uses the theme accent; Enter completes a partial pick and only submits when the typed name already matches
-- A collapsed successful `read` stays one unboxed line; `write` and `edit` stay native; `Ctrl+O` expands to Pi's renderer
+- A collapsed successful `read` stays one unboxed line
 - Tool preview re-registers `read` only while that name is still owned by Pi. After upgrading Pi, re-check its output.
 
 ## License

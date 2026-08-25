@@ -35,6 +35,8 @@ export type FooterFields = {
 	percent: number | null;
 	cwd: string;
 	tps: number | null;
+	/** True while an assistant message streams without measurable output yet: show `…` instead of `—`. */
+	tpsStreaming?: boolean;
 	cacheHit: number | null;
 };
 
@@ -240,8 +242,8 @@ export function fitFooter(fields: FooterFields, width: number, home?: string): F
 		return { line: joinFitted(fitted), fitted };
 	};
 
-	const fullTps = formatTps(fields.tps, "tok/s");
-	const shortTps = formatTps(fields.tps, "t/s");
+	const fullTps = formatTps(fields.tps, "tok/s", fields.tpsStreaming);
+	const shortTps = formatTps(fields.tps, "t/s", fields.tpsStreaming);
 
 	const steps: Array<() => ReturnType<typeof attempt>> = [
 		() => attempt(fullModel, fullCwd, fullTps),
@@ -345,6 +347,7 @@ export function installFooter(ctx: ExtensionContext, store: CraftStore): void {
 								percent: usage?.percent ?? null,
 								cwd: ctx.cwd || snap.cwd,
 								tps: snap.tps.tps,
+								tpsStreaming: snap.tps.streaming,
 								cacheHit,
 							},
 							[...footerData.getExtensionStatuses().values()],

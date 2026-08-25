@@ -143,8 +143,8 @@ export function shortenModelLabel(label: string, maxWidth: number): string {
 	return `…${leaf.slice(-(maxWidth - 1))}`;
 }
 
-export function formatTps(tps: number | null, unit: "tok/s" | "t/s" = "tok/s"): string {
-	if (tps == null || !Number.isFinite(tps)) return `${UNKNOWN} ${unit}`;
+export function formatTps(tps: number | null, unit: "tok/s" | "t/s" = "tok/s", pending = false): string {
+	if (tps == null || !Number.isFinite(tps)) return `${pending ? "…" : UNKNOWN} ${unit}`;
 	return `${Math.round(tps)} ${unit}`;
 }
 

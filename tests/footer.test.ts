@@ -11,6 +11,7 @@ import {
 	formatFooterModelThinking,
 	formatModelThinking,
 	formatTokens,
+	formatTps,
 	cumulativeCacheHitRate,
 	paintFooterModelThinking,
 	paintModelThinking,
@@ -34,6 +35,12 @@ describe("token and context formatting", () => {
 		assert.equal(formatTokens(126_000), "126k");
 		assert.equal(formatTokens(400_000), "400k");
 		assert.equal(formatTokens(42), "42");
+	});
+
+	it("shows ellipsis while streaming without measurable output, dash otherwise", () => {
+		assert.equal(formatTps(null, "tok/s", true), "… tok/s");
+		assert.equal(formatTps(null, "tok/s", false), "— tok/s");
+		assert.equal(formatTps(42, "tok/s", true), "42 tok/s");
 	});
 
 	it("renders missing context as placeholders", () => {

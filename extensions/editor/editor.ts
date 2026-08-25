@@ -1,7 +1,7 @@
 import { PROMPT_CHAR, PROMPT_LEFT_PAD, PROMPT_GUTTER_COLS } from "../config.ts";
 import { sliceByColumn, truncateToWidth, visibleWidth, type AutocompleteItem, type AutocompleteProvider, type Editor, type EditorTheme, type TUI } from "@earendil-works/pi-tui";
 import { CustomEditor, type ExtensionAPI, type ExtensionContext, type KeybindingsManager, type Theme } from "@earendil-works/pi-coding-agent";
-import { buildSkillCatalog, type SkillCatalog } from "../catalog.ts";
+import type { SkillCatalog } from "../catalog.ts";
 import { colorizeLeadingCommand, recognizedLeadingCommand } from "./command-paint.ts";
 
 const RESET_BG = "\x1b[49m";
@@ -188,9 +188,9 @@ export class CraftEditor extends CustomEditor {
 	}
 }
 
-export function installEditor(ctx: ExtensionContext, pi: ExtensionAPI): void {
+export function installEditor(ctx: ExtensionContext, pi: ExtensionAPI, getCatalog: () => SkillCatalog): void {
 	const theme = ctx.ui.theme;
 	ctx.ui.setEditorComponent((tui, editorTheme, keybindings) => {
-		return new CraftEditor(tui, editorTheme, keybindings, theme, () => buildSkillCatalog(pi.getCommands()));
+		return new CraftEditor(tui, editorTheme, keybindings, theme, getCatalog);
 	});
 }

@@ -24,7 +24,9 @@ export type OutputUsage = {
  * tok/s = provider usage.output / seconds from message_start to message_end.
  * TTFT, hidden reasoning, buffering, and stalls stay in the denominator; tool
  * waits between messages do not. There is no character estimate and no stall
- * subtraction — without provider output the Footer keeps the last integer.
+ * subtraction — without provider output the Footer keeps the last integer, so
+ * the slot stays calm while the next message has not produced measurable
+ * output yet.
  *
  * Live display waits until one second has elapsed and usage.output is known,
  * then publishes at most every TPS_DISPLAY_INTERVAL_MS, ignoring integer

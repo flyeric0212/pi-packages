@@ -161,6 +161,18 @@ describe("TokenSpeedEngine", () => {
 		assert.equal(engine.snapshot().tps, 20);
 	});
 
+	it("keeps the finished value during tool waits between messages", () => {
+		let now = 0;
+		const engine = new TokenSpeedEngine(() => now);
+		engine.start();
+		now = 1_000;
+		engine.finish({ output: 20 });
+		assert.equal(engine.snapshot().tps, 20);
+		now = 60_000;
+		assert.equal(engine.snapshot().streaming, false);
+		assert.equal(engine.snapshot().tps, 20);
+	});
+
 	it("publishes the finished value immediately even inside the live interval", () => {
 		let now = 0;
 		const engine = new TokenSpeedEngine(() => now);

@@ -1,4 +1,4 @@
-import { canUseShortName, SKILL_PREFIX, skillShortName, buildSkillCatalog, type SkillCatalog } from "../catalog.ts";
+import { canUseShortName, SKILL_PREFIX, skillShortName, type SkillCatalog } from "../catalog.ts";
 import { type AutocompleteItem } from "@earendil-works/pi-tui";
 import { type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
@@ -48,10 +48,10 @@ export function shortenSkillSuggestions(
 	});
 }
 
-export function installSkillShortcuts(pi: ExtensionAPI): void {
+export function installSkillShortcuts(pi: ExtensionAPI, getCatalog: () => SkillCatalog): void {
 	pi.on("input", (event) => {
 		if (event.source === "extension") return;
-		const next = rewriteLeadingSkillCommand(event.text, buildSkillCatalog(pi.getCommands()));
+		const next = rewriteLeadingSkillCommand(event.text, getCatalog());
 		if (next === undefined) return;
 		return { action: "transform" as const, text: next, images: event.images };
 	});
@@ -65,7 +65,7 @@ export function installSkillShortcuts(pi: ExtensionAPI): void {
 				if (!result) return result;
 				return {
 					...result,
-					items: shortenSkillSuggestions(result.items, result.prefix, buildSkillCatalog(pi.getCommands())),
+					items: shortenSkillSuggestions(result.items, result.prefix, getCatalog()),
 				};
 			},
 			applyCompletion(lines, cursorLine, cursorCol, item, prefix) {
