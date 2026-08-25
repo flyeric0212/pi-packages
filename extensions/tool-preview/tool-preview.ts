@@ -14,6 +14,8 @@ import {
 	type BranchEntry,
 	type LiveRead,
 	type ReadAssignment,
+	type ReadCallRef,
+	type ReadResultFact,
 } from "./group.ts";
 
 export const PREVIEW_TOOL_NAMES = ["bash", "grep", "find", "ls"] as const;
@@ -72,7 +74,7 @@ const NATIVE_CALL_SLOT = "__craftNativeCall";
 const NATIVE_RESULT_SLOT = "__craftNativeResult";
 const EMPTY_SLOT = "__craftEmpty";
 const GROUP_CALL_SLOT = "__craftGroupCall";
-const LEADER_NOTIFIED_SLOT = "__craftNotifiedLeader";
+const GROUP_TOKEN_SLOT = "__craftGroupToken";
 
 const builtInCache = new Map<string, BuiltInSet>();
 
@@ -196,6 +198,28 @@ function liveRead(context: RenderContext, hasImage: boolean): LiveRead {
 	};
 }
 
+const settledReads = new Map<string, ReadResultFact>();
+const liveCalls = new Map<string, ReadCallRef>();
+
+function noteCall(id: string | undefined, path: string): void {
+	if (!id) return;
+	liveCalls.set(id, { id, path, read: path.length > 0 });
+}
+
+function noteSettled(id: string | undefined, fact: ReadResultFact | undefined): void {
+	if (!id) return;
+	if (!fact) settledReads.delete(id);
+	else settledReads.set(id, fact);
+}
+
+function resultsFor(entries: readonly BranchEntry[]): Map<string, ReadResultFact> {
+	const results = new Map(collectReadResults(entries));
+	for (const [id, fact] of settledReads) {
+		if (!results.has(id)) results.set(id, fact);
+	}
+	return results;
+}
+
 function assignCurrentRead(
 	getBranch: BranchReader,
 	context: RenderContext,
@@ -203,17 +227,15 @@ function assignCurrentRead(
 	hasImage: boolean,
 ): ReadAssignment {
 	const live = liveRead(context, hasImage);
+	const path = readArgPath(args);
+	noteCall(live.id, path);
+	if (live.isPartial) noteSettled(live.id, undefined);
+	else if (live.id) noteSettled(live.id, { isError: live.isError, hasImage: live.hasImage });
 	if (!live.id) {
-		const path = readArgPath(args);
 		return { role: "standalone", leaderId: "", ids: [], paths: path ? [path] : [] };
 	}
-	let entries: readonly BranchEntry[] = [];
-	try {
-		entries = getBranch();
-	} catch {
-		entries = [];
-	}
-	return assignReadRole(readCallsAround(entries, live.id), collectReadResults(entries), live);
+	const entries = safeBranch(getBranch);
+	return assignReadRole(readCallsAround(entries, live.id, [...liveCalls.values()]), resultsFor(entries), live);
 }
 
 function registerReadTool(pi: ExtensionAPI, cwd: string, getBranch: BranchReader, invalidators: Map<string, () => void>): void {
@@ -231,11 +253,8 @@ function registerReadTool(pi: ExtensionAPI, cwd: string, getBranch: BranchReader
 			if (ctx.toolCallId) invalidators.set(ctx.toolCallId, ctx.invalidate);
 			const hasImage = collectReadResults(safeBranch(getBranch)).get(ctx.toolCallId ?? "")?.hasImage ?? false;
 			const assignment = assignCurrentRead(getBranch, ctx, args, hasImage);
-			if (assignment.role === "follower") {
-				notifyLeader(ctx, assignment, invalidators);
-				return emptySlot(ctx);
-			}
-			ctx.state[LEADER_NOTIFIED_SLOT] = undefined;
+			notifyGroup(ctx, assignment, invalidators);
+			if (assignment.role === "follower") return emptySlot(ctx);
 			if (assignment.role === "leader") return groupedCall(assignment.paths, theme, ctx);
 			if (!usesReadShellBox(ctx)) return native;
 			return paintShellCall(native, theme, ctx);
@@ -250,11 +269,8 @@ function registerReadTool(pi: ExtensionAPI, cwd: string, getBranch: BranchReader
 			);
 			if (ctx.toolCallId) invalidators.set(ctx.toolCallId, ctx.invalidate);
 			const assignment = assignCurrentRead(getBranch, ctx, ctx.args, contentHasImage(result?.content));
-			if (assignment.role === "follower") {
-				notifyLeader(ctx, assignment, invalidators);
-				return emptySlot(ctx);
-			}
-			ctx.state[LEADER_NOTIFIED_SLOT] = undefined;
+			notifyGroup(ctx, assignment, invalidators);
+			if (assignment.role === "follower") return emptySlot(ctx);
 			if (!usesReadShellBox({ expanded: options.expanded, isError: ctx.isError })) return native;
 			return paintShellResult(native, theme, ctx);
 		},
@@ -269,15 +285,21 @@ function safeBranch(getBranch: BranchReader): readonly BranchEntry[] {
 	}
 }
 
-function notifyLeader(
+function notifyGroup(
 	context: RenderContext,
 	assignment: ReadAssignment,
 	invalidators: Map<string, () => void>,
 ): void {
-	const token = `${assignment.leaderId}:${assignment.ids.join(",")}`;
-	if (!assignment.leaderId || context.state[LEADER_NOTIFIED_SLOT] === token) return;
-	context.state[LEADER_NOTIFIED_SLOT] = token;
-	invalidators.get(assignment.leaderId)?.();
+	const self = context.toolCallId ?? "";
+	const token = `${assignment.role}:${assignment.leaderId}:${assignment.ids.join(",")}`;
+	if (context.state[GROUP_TOKEN_SLOT] === token) return;
+	context.state[GROUP_TOKEN_SLOT] = token;
+	if (assignment.role === "standalone" || assignment.ids.length < 2) return;
+	const targets = assignment.role === "leader" ? assignment.ids : [assignment.leaderId];
+	for (const id of targets) {
+		if (!id || id === self) continue;
+		invalidators.get(id)?.();
+	}
 }
 
 export function installToolPreview(pi: ExtensionAPI): void {
@@ -309,5 +331,7 @@ export function installToolPreview(pi: ExtensionAPI): void {
 	pi.on("session_shutdown", () => {
 		getBranch = () => [];
 		invalidators.clear();
+		settledReads.clear();
+		liveCalls.clear();
 	});
 }

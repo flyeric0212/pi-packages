@@ -6,10 +6,6 @@
 
 ![总览](./assets/overview.png)
 
-![Header](./assets/header.png)
-
-![输入区与 Footer](./assets/editor.png)
-
 ## 安装
 
 先用 `pi config` 关掉其他 TUI。
@@ -42,7 +38,7 @@ pi -e git:github.com/flyeric0212/pi-craft-tui
 - `/clear` 和 `/cls` 只清屏，历史、`/tree` 和模型上下文都保留
 - `/skill-name` 运行已加载的 skill（等同 `/skill:skill-name`）
 - 斜杠命令：命令名用主题强调色；Enter 在部分匹配时只补全，打全了才提交
-- 折叠的 `grep` / `find` / `ls` / `bash` 最多显示 3 行结果；同一轮里连续成功的折叠 `read` 合成一组路径列表；单条 `read` 仍是一行、没有色块；`write` 和 `edit` 保持原生；`Ctrl+O` 展开为 Pi 原生渲染
+- 折叠的 `grep` / `find` / `ls` / `bash` 最多显示 3 行结果；连续成功的折叠 `read` 合成一组路径列表；单条 `read` 仍是一行、没有色块；`write` 和 `edit` 保持原生；`Ctrl+O` 展开为 Pi 原生渲染
 - 工具预览只会在 `read` / `bash` / `grep` / `find` / `ls` 仍由 Pi 内置持有时同名重新注册它们。升级 Pi 后请回归这五个工具的折叠和展开显示
 
 ## License

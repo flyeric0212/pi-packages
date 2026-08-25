@@ -87,13 +87,37 @@ export function readCallsInMessage(message: { role?: string; content?: unknown }
 	return calls;
 }
 
-export function readCallsAround(entries: readonly BranchEntry[], toolCallId: string): ReadCallRef[] {
+const USER_BREAK: ReadCallRef = { id: "", path: "", read: false };
+
+/** Tool calls on the branch in source order. User turns split a run of reads. */
+export function readCallsInBranch(entries: readonly BranchEntry[]): ReadCallRef[] {
+	const calls: ReadCallRef[] = [];
 	for (const entry of entries) {
 		if (entry.type !== "message") continue;
-		const calls = readCallsInMessage(entry.message);
-		if (calls.some((call) => call.id === toolCallId)) return calls;
+		const role = entry.message?.role;
+		if (role === "user") {
+			if (calls.length > 0 && calls[calls.length - 1] !== USER_BREAK) calls.push(USER_BREAK);
+			continue;
+		}
+		if (role === "assistant") calls.push(...readCallsInMessage(entry.message));
 	}
-	return [];
+	return calls;
+}
+
+export function readCallsAround(
+	entries: readonly BranchEntry[],
+	toolCallId: string,
+	extras: readonly ReadCallRef[] = [],
+): ReadCallRef[] {
+	const calls = readCallsInBranch(entries);
+	const seen = new Set(calls.map((call) => call.id).filter((id) => id.length > 0));
+	for (const extra of extras) {
+		if (!extra.id || seen.has(extra.id)) continue;
+		calls.push(extra);
+		seen.add(extra.id);
+	}
+	if (!seen.has(toolCallId)) return [];
+	return calls;
 }
 
 export function collectReadResults(entries: readonly BranchEntry[]): Map<string, ReadResultFact> {
@@ -119,11 +143,9 @@ export function isGroupableRead(
 	const call = ordered.find((item) => item.id === id);
 	if (!call || !call.read || call.path.length === 0) return false;
 	if (live.expanded) return false;
-	if (id === live.id) {
-		return !live.isPartial && !live.isError && !live.hasImage;
-	}
+	if (id === live.id) return !live.isError && !live.hasImage;
 	const result = results.get(id);
-	if (!result || result.isError || result.hasImage) return false;
+	if (result?.isError || result?.hasImage) return false;
 	return true;
 }
 
