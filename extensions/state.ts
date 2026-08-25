@@ -6,17 +6,15 @@ export type CraftState = {
 	thinking?: string;
 	cwd: string;
 	version: string;
-	responding: boolean;
 	tps: TokenSpeedSnapshot;
 };
 
-const idleTps: TokenSpeedSnapshot = { tps: null, estimated: false, streaming: false };
+const idleTps: TokenSpeedSnapshot = { tps: null, streaming: false };
 
 export function createState(init?: Partial<CraftState>): CraftState {
 	return {
 		cwd: init?.cwd ?? "",
 		version: init?.version ?? "",
-		responding: init?.responding ?? false,
 		tps: init?.tps ?? idleTps,
 		modelName: init?.modelName,
 		modelId: init?.modelId,
@@ -67,7 +65,6 @@ export function sameCraftState(a: CraftState, b: CraftState): boolean {
 		a.thinking === b.thinking &&
 		a.cwd === b.cwd &&
 		a.version === b.version &&
-		a.responding === b.responding &&
 		a.tps.streaming === b.tps.streaming &&
 		displayedTps(a.tps.tps) === displayedTps(b.tps.tps)
 	);

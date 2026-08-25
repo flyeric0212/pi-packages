@@ -25,13 +25,6 @@ export function prefixUserPrompt(markdown: string, prompt = PROMPT_CHAR): string
 	return `${prompt} ${text}`;
 }
 
-export function findBottomBorderIndex(lines: readonly string[]): number {
-	for (let i = lines.length - 1; i >= 0; i--) {
-		if (lines[i]?.includes(BORDER_GLYPH)) return i;
-	}
-	return Math.max(0, lines.length - 1);
-}
-
 export type EditorChromeLayout = {
 	contentIndex: number;
 	bottomIndex: number;

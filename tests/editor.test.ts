@@ -7,7 +7,6 @@ import {
 } from "../extensions/editor/command-paint.ts";
 import {
 	fillRow,
-	findBottomBorderIndex,
 	inspectEditorChrome,
 	insertPrompt,
 	isBashInput,
@@ -33,11 +32,6 @@ describe("CraftEditor layout helpers", () => {
 		assert.equal(isBashInput("!ls"), true);
 		assert.equal(isBashInput("  !git status"), true);
 		assert.equal(isBashInput("hello"), false);
-	});
-
-	it("treats the last border glyph row as the panel bottom", () => {
-		const lines = ["────────", "  hello", "────────", "item"];
-		assert.equal(findBottomBorderIndex(lines), 2);
 	});
 
 	it("turns former border rows into vertical padding", () => {

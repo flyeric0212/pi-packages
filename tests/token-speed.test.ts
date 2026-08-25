@@ -7,7 +7,7 @@ describe("TokenSpeedEngine", () => {
 		let now = 0;
 		const engine = new TokenSpeedEngine(() => now);
 		engine.start();
-		assert.deepEqual(engine.snapshot(), { tps: null, estimated: false, streaming: true });
+		assert.deepEqual(engine.snapshot(), { tps: null, streaming: true });
 	});
 
 	it("does not paint a character estimate when provider output is missing", () => {
@@ -30,9 +30,8 @@ describe("TokenSpeedEngine", () => {
 		engine.note({ output: 20 });
 		now = 5_000;
 		engine.finish({ output: 20 });
-		const { tps, estimated, streaming } = engine.snapshot();
+		const { tps, streaming } = engine.snapshot();
 		assert.equal(streaming, false);
-		assert.equal(estimated, false);
 		assert.equal(tps, 4);
 	});
 
@@ -113,7 +112,6 @@ describe("TokenSpeedEngine", () => {
 		now = 1_000;
 		engine.finish({ output: 500, reasoning: 480 });
 		const snap = engine.snapshot();
-		assert.equal(snap.estimated, false);
 		assert.equal(snap.tps, 500);
 	});
 
@@ -182,6 +180,6 @@ describe("TokenSpeedEngine", () => {
 		now = 1_000;
 		engine.finish({ output: 20 });
 		engine.reset();
-		assert.deepEqual(engine.snapshot(), { tps: null, estimated: false, streaming: false });
+		assert.deepEqual(engine.snapshot(), { tps: null, streaming: false });
 	});
 });

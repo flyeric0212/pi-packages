@@ -10,7 +10,6 @@ export type NowFn = () => number;
 
 export type TokenSpeedSnapshot = {
 	tps: number | null;
-	estimated: boolean;
 	streaming: boolean;
 };
 
@@ -123,14 +122,14 @@ export class TokenSpeedEngine {
 	}
 
 	private publish(snap: TokenSpeedSnapshot): void {
-		this.published = { tps: snap.tps, estimated: false, streaming: this.streaming };
+		this.published = { tps: snap.tps, streaming: this.streaming };
 		this.publishedGeneration = this.generation;
 		this.publishedAt = this.now();
 	}
 
 	private view(): TokenSpeedSnapshot {
-		if (!this.published) return { tps: null, estimated: false, streaming: this.streaming };
-		return { ...this.published, estimated: false, streaming: this.streaming };
+		if (!this.published) return { tps: null, streaming: this.streaming };
+		return { ...this.published, streaming: this.streaming };
 	}
 
 	private measure(): TokenSpeedSnapshot {
@@ -138,13 +137,13 @@ export class TokenSpeedEngine {
 		const tokens = outputTokens(this.usage);
 		const elapsedMs = this.elapsedMs();
 		if (tokens <= 0 || elapsedMs < TPS_MIN_ACTIVE_MS) {
-			return { tps: null, estimated: false, streaming };
+			return { tps: null, streaming };
 		}
 		const tps = tokens / (elapsedMs / 1000);
 		if (!Number.isFinite(tps) || tps <= 0 || tps > TPS_MAX_PLAUSIBLE) {
-			return { tps: null, estimated: false, streaming };
+			return { tps: null, streaming };
 		}
-		return { tps, estimated: false, streaming };
+		return { tps, streaming };
 	}
 
 	private elapsedMs(): number {

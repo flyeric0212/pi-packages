@@ -47,7 +47,6 @@ export default function (pi: ExtensionAPI): void {
 			thinking: ctx.thinkingLevel ?? pi.getThinkingLevel(),
 			cwd: ctx.cwd,
 			version: VERSION,
-			responding: !ctx.isIdle(),
 			tps: tps.snapshot(),
 		});
 	};
@@ -70,10 +69,6 @@ export default function (pi: ExtensionAPI): void {
 		}
 		store.reset({ version: VERSION });
 		installed = false;
-	});
-
-	pi.on("resources_discover", (_event, ctx) => {
-		if (isTui(ctx)) syncFrom(ctx);
 	});
 
 	pi.on("model_select", (_event, ctx) => {
@@ -99,8 +94,8 @@ export default function (pi: ExtensionAPI): void {
 		}
 		tps.note(assistantUsage(event.message));
 		const snap = tps.snapshot();
-		if (sameDisplayedTps(store.snapshot.tps, snap) && store.snapshot.responding) return;
-		store.patch({ tps: snap, responding: true });
+		if (sameDisplayedTps(store.snapshot.tps, snap)) return;
+		store.patch({ tps: snap });
 	});
 
 	pi.on("message_end", (event, ctx) => {

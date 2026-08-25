@@ -20,18 +20,16 @@ describe("CraftStore", () => {
 		const a = createState({
 			cwd: "/tmp",
 			version: "1",
-			responding: true,
-			tps: { tps: 41.2, estimated: true, streaming: true },
+			tps: { tps: 41.2, streaming: true },
 		});
 		const b = createState({
 			cwd: "/tmp",
 			version: "1",
-			responding: true,
-			tps: { tps: 41.4, estimated: false, streaming: true },
+			tps: { tps: 41.4, streaming: true },
 		});
 		assert.equal(sameCraftState(a, b), true);
 		assert.equal(
-			sameCraftState(a, createState({ ...b, tps: { tps: 42, estimated: false, streaming: true } })),
+			sameCraftState(a, createState({ ...b, tps: { tps: 42, streaming: true } })),
 			false,
 		);
 	});
