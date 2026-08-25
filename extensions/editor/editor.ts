@@ -128,7 +128,8 @@ export function paintCraftEditor(lines: readonly string[], paint: CraftEditorPai
 	}
 	next[layout.contentIndex] = insertPrompt(next[layout.contentIndex] ?? "", paint.prompt);
 	for (let i = 0; i <= layout.bottomIndex; i++) {
-		const stripped = replaceBorderGlyphs(next[i] ?? "");
+		const line = next[i] ?? "";
+		const stripped = i === 0 || i === layout.bottomIndex ? replaceBorderGlyphs(line) : line;
 		next[i] = isEmptyBackground(paint.bg) ? stripped : fillRow(stripped, paint.width, paint.bg);
 	}
 	return next.map((line) => truncateToWidth(line, paint.width, ""));

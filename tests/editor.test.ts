@@ -175,4 +175,34 @@ describe("editor chrome probe", () => {
 			lines,
 		);
 	});
+
+	it("strips chrome ─ but keeps box-drawing in the typed content", () => {
+		const painted = paintCraftEditor(["────────", "  a─b", "  ────", "────────", "/clear"], {
+			width: 20,
+			text: "a─b\n────",
+			bg: "",
+			prompt: "❯",
+			accent: "",
+		});
+		assert.ok(!painted[0]!.includes("─"));
+		assert.match(painted[1]!, /a─b/);
+		assert.equal(painted[2], "  ────");
+		assert.ok(!painted[3]!.includes("─"));
+		assert.equal(painted[4], "/clear");
+	});
+
+	it("still fills content rows after leaving content glyphs alone", () => {
+		const bg = "\x1b[48;2;1;2;3m";
+		const painted = paintCraftEditor(["────────", "  a─b", "────────"], {
+			width: 12,
+			text: "a─b",
+			bg,
+			prompt: "❯",
+			accent: "",
+		});
+		assert.ok(painted[1]!.includes("─"));
+		assert.ok(painted[1]!.includes(bg));
+		assert.ok(!painted[0]!.includes("─"));
+		assert.ok(!painted[2]!.includes("─"));
+	});
 });
