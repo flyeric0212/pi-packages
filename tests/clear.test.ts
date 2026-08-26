@@ -13,7 +13,7 @@ import {
 	shouldFillViewport,
 	spacerRows,
 	type ClearBranchEntry,
-} from "../extensions/clear/clear.ts";
+} from "../extensions/commands/clear.ts";
 import { fallbackIfStale } from "../extensions/utils.ts";
 import { visibleWidth } from "@earendil-works/pi-tui";
 

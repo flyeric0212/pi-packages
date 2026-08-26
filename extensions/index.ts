@@ -1,9 +1,9 @@
 import { VERSION, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { installClear } from "./clear/clear.ts";
+import { installClear } from "./commands/clear.ts";
 import { installEditor, prefixUserPrompt } from "./editor/editor.ts";
 import { installFooter } from "./footer/footer.ts";
 import { installHeader } from "./header/header.ts";
-import { installSkillShortcuts } from "./skill-shortcuts/skill-shortcuts.ts";
+import { installSkillShortcuts } from "./commands/skill-shortcuts.ts";
 import { buildSkillCatalog, type SkillCatalog } from "./catalog.ts";
 import { CraftStore } from "./state.ts";
 import {
