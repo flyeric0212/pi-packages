@@ -254,6 +254,22 @@ describe("footer fit", () => {
 		assert.equal(fitted.cwd, undefined);
 	});
 
+	it("appends the git branch to the cwd slot and drops it with the slot", () => {
+		const withBranch = fitFooter({ ...base, gitBranch: "main" }, 120, "/Users/eric");
+		assert.equal(withBranch.cwd, "~/Code/project (main)");
+
+		// The branch survives path compaction…
+		const compact = fitFooter({ ...base, gitBranch: "main" }, 60, "/Users/eric");
+		assert.ok(compact.cwd === undefined || /\(main\)$/.test(compact.cwd));
+
+		// …and disappears exactly when the cwd slot does.
+		const narrow = fitFooter({ ...base, gitBranch: "main" }, 28, "/Users/eric");
+		assert.equal(narrow.cwd, undefined);
+
+		// No branch in a repo-less session: no dangling parens.
+		assert.ok(!fitFooter(base, 120, "/Users/eric").cwd?.includes("("));
+	});
+
 	it("never wraps the fitted core beyond the given width", () => {
 		for (const width of [60, 80, 100, 120]) {
 			const fitted = fitFooter({ ...base, cacheHit: 87.3 }, width, "/Users/eric");
@@ -349,6 +365,7 @@ describe("footer session facts memo keys", () => {
 	function leaf(overrides: Partial<LeafFacts> = {}): LeafFacts {
 		return {
 			leafId: "leaf-1",
+			branchLength: 3,
 			entry: { id: "leaf-1", message: { role: "assistant", content: [{ type: "text", text: "hi" }] } },
 			...overrides,
 		};
@@ -377,6 +394,13 @@ describe("footer session facts memo keys", () => {
 		const otherLeaf = leaf({ leafId: "leaf-2" });
 		assert.notEqual(cacheHitMemoKey(withCache), cacheHitMemoKey(noCache));
 		assert.notEqual(cacheHitMemoKey(withCache), cacheHitMemoKey(otherLeaf));
+	});
+
+	it("keys change when compaction reshapes the branch without moving the leaf", () => {
+		const before = leaf({ branchLength: 12 });
+		const after = leaf({ branchLength: 4 });
+		assert.notEqual(cacheHitMemoKey(before), cacheHitMemoKey(after));
+		assert.notEqual(contextMemoKey(before, "m1"), contextMemoKey(after, "m1"));
 	});
 
 	it("context key tracks output, text, and model changes", () => {
@@ -440,6 +464,9 @@ describe("footer session facts memo keys", () => {
 		const stale = {
 			getLeafId() {
 				throw new Error("This extension ctx is stale after session replacement or reload.");
+			},
+			getBranch() {
+				return [];
 			},
 			getLeafEntry() {
 				return undefined;
@@ -592,8 +619,8 @@ describe("footer memo time clamp", () => {
 });
 
 describe("footer render frames reuse the branch scan", () => {
-	it("keeps getBranch out of streaming frames whose facts did not change", () => {
-		let branchScans = 0;
+	it("keeps the heavy branch usage scan out of streaming frames whose facts did not change", () => {
+		let usageScans = 0;
 		const manager = {
 			getLeafId: () => "leaf-1",
 			getLeafEntry: () => ({
@@ -604,29 +631,29 @@ describe("footer render frames reuse the branch scan", () => {
 					content: [{ type: "text", text: "growing text" }],
 				},
 			}),
-			getBranch: () => {
-				branchScans += 1;
-				return [
-					{
-						id: "leaf-1",
-						type: "message" as const,
-						message: { role: "assistant", usage: { input: 10, output: 50, cacheRead: 4, cacheWrite: 1 } },
-					},
-				];
-			},
+			// O(1) length read for the fingerprint; counted separately from the
+			// heavy per-entry walk that only the compute closure may trigger.
+			getBranch: () => [
+				{
+					id: "leaf-1",
+					type: "message" as const,
+					message: { role: "assistant", usage: { input: 10, output: 50, cacheRead: 4, cacheWrite: 1 } },
+				},
+			],
 		};
 		const cacheHitMemo = new Memo<number | null>();
 		const contextMemo = new Memo<{ tokens: number; percent: number } | undefined>();
 		const renderFrame = (): void => {
 			const leafFacts = readLeafFacts(manager);
-			cacheHitMemo.get(cacheHitMemoKey(leafFacts), () =>
-				cumulativeCacheHitRate(assistantCacheUsages(manager.getBranch())),
-			);
-			contextMemo.get(contextMemoKey(leafFacts, "m1"), () => ({ tokens: 100, percent: 25 }));
+			cacheHitMemo.get(cacheHitMemoKey(leafFacts), () => {
+				usageScans += 1;
+				return cumulativeCacheHitRate(assistantCacheUsages(manager.getBranch()));
+			});
+			contextMemo.get(contextMemoKey(leafFacts, "m1"), () => ({ tokens: 100, percent: 25 }), false);
 		};
 		renderFrame();
 		renderFrame();
 		renderFrame();
-		assert.equal(branchScans, 1);
+		assert.equal(usageScans, 1);
 	});
 });

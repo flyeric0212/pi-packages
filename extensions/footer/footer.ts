@@ -36,6 +36,8 @@ export type FooterFields = {
 	contextWindow: number | null;
 	percent: number | null;
 	cwd: string;
+	/** Git branch for the Claude-Code-style `(main)` suffix on the cwd slot. */
+	gitBranch?: string | null;
 	tps: number | null;
 	/** True while an assistant message streams without measurable output yet: show `…` instead of `—`. */
 	tpsStreaming?: boolean;
@@ -58,24 +60,32 @@ type LeafMessage = {
 export type LeafFacts = {
 	leafId: string | null;
 	entry?: { id?: string; message?: LeafMessage };
+	/** Branch entry count: changes on compaction even when the leaf id does not. */
+	branchLength: number;
 };
 
 type LeafManager = {
 	getLeafId(): string | null;
+	getBranch(): readonly unknown[];
 	getLeafEntry(): { id?: string; message?: LeafMessage } | undefined;
 };
 
 /**
- * The session branch is append-only: the leaf id plus the streaming tail's own
- * state fingerprint what the expensive branch facts (`getContextUsage`, the
- * cumulative cache-hit scan) can possibly depend on. Same as the clear view's
- * leaf-id memo, but the tail fingerprint also covers in-place growth of the
- * message currently streaming.
+ * The session branch is append-only: the leaf id plus the branch entry count
+ * fingerprint what the expensive branch facts (`getContextUsage`, the
+ * cumulative cache-hit scan) can possibly depend on. The count covers
+ * compaction, which reshapes the branch without moving the leaf. Same as the
+ * clear view's leaf-id memo, but the tail fingerprint also covers in-place
+ * growth of the message currently streaming.
  */
 export function readLeafFacts(manager: LeafManager | undefined): LeafFacts | undefined {
 	if (!manager) return undefined;
 	try {
-		return { leafId: manager.getLeafId(), entry: manager.getLeafEntry() };
+		return {
+			leafId: manager.getLeafId(),
+			branchLength: manager.getBranch().length,
+			entry: manager.getLeafEntry(),
+		};
 	} catch (error) {
 		if (isStaleExtensionError(error)) return undefined;
 		throw error;
@@ -133,7 +143,7 @@ export function tailEstimateChars(content: unknown): number {
 export function cacheHitMemoKey(facts: LeafFacts | undefined): string | undefined {
 	if (!facts) return undefined;
 	const usage = facts.entry?.message?.usage;
-	const key = [facts.leafId ?? "", usage ? finiteOrZero(usage.input) : "", usage ? finiteOrZero(usage.cacheRead) : "", usage ? finiteOrZero(usage.cacheWrite) : ""].join("|");
+	const key = [facts.leafId ?? "", String(facts.branchLength), usage ? finiteOrZero(usage.input) : "", usage ? finiteOrZero(usage.cacheRead) : "", usage ? finiteOrZero(usage.cacheWrite) : ""].join("|");
 	return key;
 }
 
@@ -149,6 +159,7 @@ export function contextMemoKey(facts: LeafFacts | undefined, modelId: string | u
 	const usage = message?.usage;
 	const key = [
 		facts.leafId ?? "",
+		String(facts.branchLength),
 		modelId ?? "",
 		message?.role ?? "",
 		usage ? usageValues(usage) : "none",
@@ -246,7 +257,11 @@ export function fitFooter(fields: FooterFields, width: number, home?: string): F
 	const thinking = fields.thinking?.trim() ?? "";
 	const fullModel = modelLabel(fields.modelName, fields.modelId);
 	const context = formatContextUsage(fields.usedTokens, fields.contextWindow);
-	const fullCwd = formatHomePath(fields.cwd, home);
+	const homeCwd = formatHomePath(fields.cwd, home);
+	// Claude-Code-style location marker: the branch rides on every cwd variant
+	// (full, middle-ellipsized, compact) and vanishes with the slot itself on
+	// the narrowest fallback steps.
+	const fullCwd = fields.gitBranch ? `${homeCwd} (${fields.gitBranch})` : homeCwd;
 	const compactCwd = compactProjectPath(fullCwd);
 	const tone = contextTone(fields.percent);
 	const cache = formatCacheHit(fields.cacheHit);
@@ -353,8 +368,13 @@ export function installFooter(ctx: ExtensionContext, store: CraftStore): void {
 			minIntervalMs: CONTEXT_COMPUTE_MIN_INTERVAL_MS,
 		});
 		const unsubscribe = store.subscribe(() => tui.requestRender());
+		// Pi owns the git watchers; we only re-render when its cached branch flips.
+		const offBranchChange = footerData.onBranchChange(() => tui.requestRender());
 		return {
-			dispose: unsubscribe,
+			dispose() {
+				unsubscribe();
+				offBranchChange();
+			},
 			invalidate() {
 				cache.lines = undefined;
 			},
@@ -384,6 +404,7 @@ export function installFooter(ctx: ExtensionContext, store: CraftStore): void {
 								contextWindow: usage?.contextWindow ?? ctx.model?.contextWindow ?? null,
 								percent: usage?.percent ?? null,
 								cwd: ctx.cwd || snap.cwd,
+								gitBranch: footerData.getGitBranch(),
 								tps: snap.tps.tps,
 								tpsStreaming: snap.tps.streaming,
 								cacheHit,

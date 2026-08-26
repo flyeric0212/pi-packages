@@ -50,7 +50,7 @@ pi -e git:github.com/flyeric0212/pi-craft-tui
 
 - **Header** —— 新进程播放一次 π logo 动画，展示版本、标语、模型、推理强度和项目目录
 - **Editor** —— Codex 风格填充输入框，粗体 `❯`；历史消息保留同一标记；`!` 开头切换 bash 模式配色
-- **Footer** —— 单行：`model high · 126k/400k · cwd · tok/s · CH87.3%`；其他扩展的状态显示在上一行
+- **Footer** —— 单行：`model high · 126k/400k · cwd (main) · tok/s · CH87.3%`；其他扩展的状态显示在上一行
 
 **交互**
 
