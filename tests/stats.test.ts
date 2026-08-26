@@ -120,16 +120,16 @@ describe("formatStatsLines", () => {
 				assistantEntry({ timestamp: "2026-08-26T01:30:00Z" }),
 			]));
 			assert.equal(lines.length, 3);
-			assert.match(lines[0]!, /^tokens\s+↑12k ↓46k R0 W0 · Σ58k$/);
+			assert.match(lines[0]!, /^tokens:\s+↑12k ↓46k R0 W0 · Σ58k$/);
 			assert.ok(!lines.some((line) => line.startsWith("cache"))); // no cache read yet
-			assert.match(lines[2]!, /^time\s+30m 0s$/);
+			assert.match(lines[2]!, /^time:\s+30m 0s$/);
 		});
 
 		it("shows the cache row once a read exists, keeping Σ over all four buckets", () => {
 			const lines = formatStatsLines(computeSessionStats([
 				assistantEntry({ usage: { input: 12_300, output: 45_600, cacheRead: 230_000, cacheWrite: 1_200 } }),
 			]));
-			assert.match(lines[1]!, /^cache\s+CH[\d.]+%$/);
+			assert.match(lines[1]!, /^cache:\s+CH[\d.]+%$/);
 			assert.match(lines[0]!, /Σ289k$/); // Σ = the four buckets summed ourselves
 		});
 	});
@@ -142,10 +142,12 @@ describe("formatStatsLines", () => {
 describe("paintStatsView", () => {
 	it("wraps the card in a dashed frame that hugs the widest row", () => {
 		const lines = paintStatsView(EMPTY_STATS, 80);
-		assert.equal(lines.length, 3); // top + one row + bottom
-		assert.match(lines[0]!, /^ ╭┄+╮$/);
-		assert.match(lines[1]!, /^ │ no messages yet │$/);
-		assert.match(lines[2]!, /^ ╰┄+╯$/);
+		assert.equal(lines.length, 5); // top + blank + one row + blank + bottom
+		assert.match(lines[0]!, /^ ╭┄┄ Usage Stats ┄┄╮$/); // left-set title, two dashes of gap
+		assert.match(lines[1]!, /^ │\s+│$/);
+		assert.match(lines[2]!, /^ │ no messages yet │$/);
+		assert.match(lines[3]!, /^ │\s+│$/);
+		assert.match(lines[4]!, /^ ╰┄+╯$/);
 		const frameWidth = lines[0]!.length;
 		for (const line of lines) assert.equal(line.length, frameWidth);
 	});
@@ -159,5 +161,24 @@ describe("paintStatsView", () => {
 		for (const line of paintStatsView(stats, width)) {
 			assert.ok(line.length <= width);
 		}
+	});
+
+	it("paints label heads muted ahead of the colon when a theme is given", () => {
+		const stats = computeSessionStats([assistantEntry({ usage: { input: 12_300, output: 45_600 } })]);
+		const theme = { fg: (color: string, text: string) => `<${color}>${text}</${color}>` };
+		const lines = paintStatsView(stats, 80, theme);
+		assert.match(lines[0]!, /<muted> Usage Stats <\/muted>/); // title joins the muted family
+		assert.match(lines[2]!, /│ <muted>tokens:\s+<\/muted>↑12k ↓46k R0 W0 · Σ58k\s+│$/);
+		assert.ok(!lines.some((line) => line.includes("<muted>↑"))); // values stay unpainted
+	});
+
+	it("drops the title when the clamped frame gets too tight", () => {
+		const stats = computeSessionStats([
+			{ type: "message", message: { role: "user" } },
+			assistantEntry({ usage: { input: 12_300, output: 45_600 } }),
+		]);
+		const lines = paintStatsView(stats, 10);
+		assert.match(lines[0]!, /^ ╭┄+╮$/);
+		for (const line of lines) assert.ok(line.length <= 10);
 	});
 });

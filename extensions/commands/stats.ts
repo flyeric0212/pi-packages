@@ -21,6 +21,13 @@ const FRAME_BOTTOM_RIGHT = "╯";
 const FRAME_HORIZONTAL = "┄";
 const FRAME_VERTICAL = "│";
 
+/** Title set into the top border's left edge; ASCII so width equals length. */
+const CARD_TITLE = " Usage Stats ";
+/** Dashes required on each side of the title before we render it at all. */
+const MIN_TITLE_DASHES = 2;
+/** Below this interior width the title cannot fit and drops off the border. */
+const TITLE_MIN_FRAME = CARD_TITLE.length + MIN_TITLE_DASHES * 2;
+
 /** Structural slice of a branch entry that `/stats` reads. */
 export type StatsEntry = {
 	type?: string;
@@ -140,72 +147,112 @@ export function formatDuration(ms: number): string {
 	return `${seconds}s`;
 }
 
+type StatRow = { label: string; value: string };
+
+/** Structural theme slice used to mute labels; same idiom as ClearTheme. */
+export type StatsTheme = {
+	fg(color: string, text: string): string;
+};
+
+function statRows(stats: SessionStats): StatRow[] {
+	if (stats.prompts === 0 && stats.responses === 0) return [{ label: "", value: "no messages yet" }];
+	const tokens = `↑${formatTokens(stats.input)} ↓${formatTokens(stats.output)} R${formatTokens(
+		stats.cacheRead,
+	)} W${formatTokens(stats.cacheWrite)} · Σ${formatTokens(stats.total)}`;
+	const cache = formatCacheHit(stats.cacheHitPercent);
+	const turns = `${stats.prompts} prompts · ${stats.responses} responses · ${stats.toolCalls} tool calls`;
+	const rows: StatRow[] = [{ label: "tokens", value: tokens }];
+	if (cache) rows.push({ label: "cache", value: cache });
+	rows.push({ label: "turns", value: turns });
+	if (stats.durationMs != null) rows.push({ label: "time", value: formatDuration(stats.durationMs) });
+	return rows;
+}
+
+/** Colon-separated head (`tokens:  `), padded so every value starts on one column. */
+function statRowHead(label: string, labelWidth: number): string {
+	return label ? `${`${label}:`.padEnd(labelWidth)}  ` : "";
+}
+
 /**
  * Column-aligned plain-text rows. Rows whose fact is not knowable yet are
  * omitted rather than dashed: the footer already established "hide until a
  * cache read" as this package's idiom for absent metrics.
  */
 export function formatStatsLines(stats: SessionStats): string[] {
-	if (stats.prompts === 0 && stats.responses === 0) return ["no messages yet"];
-	const tokens = `↑${formatTokens(stats.input)} ↓${formatTokens(stats.output)} R${formatTokens(
-		stats.cacheRead,
-	)} W${formatTokens(stats.cacheWrite)} · Σ${formatTokens(stats.total)}`;
-	const cache = formatCacheHit(stats.cacheHitPercent);
-	const turns = `${stats.prompts} prompts · ${stats.responses} responses · ${stats.toolCalls} tool calls`;
-	const rows: Array<[string, string]> = [["tokens", tokens]];
-	if (cache) rows.push(["cache", cache]);
-	rows.push(["turns", turns]);
-	if (stats.durationMs != null) rows.push(["time", formatDuration(stats.durationMs)]);
-	const labelWidth = Math.max(...rows.map(([label]) => label.length));
-	return rows.map(([label, value]) => `${label.padEnd(labelWidth)}  ${value}`);
+	const rows = statRows(stats);
+	const labelWidth = Math.max(...rows.map(({ label }) => label.length + 1));
+	return rows.map(({ label, value }) => statRowHead(label, labelWidth) + value);
 }
 
 /**
  * Rendered from the snapshot stored in the entry at invocation time, so any
  * later frame (scrollback included) formats stored numbers in O(1) instead of
  * rescanning the branch. The card sits inside a dashed frame that hugs its
- * widest row and clamps to the terminal.
+ * widest row and clamps to the terminal; the title sits at the top border's
+ * left edge with blank rows above and below the body for breathing room.
  */
-export function paintStatsView(data: SessionStats, width: number): string[] {
+export function paintStatsView(data: SessionStats, width: number, theme?: StatsTheme): string[] {
 	const outer = Math.max(0, width - CHROME_LEFT_PAD);
 	const pad = " ".repeat(CHROME_LEFT_PAD);
-	const rows = formatStatsLines(data);
-	// One blank column of breathing room on each side of the content.
+	const rows = statRows(data);
+	const labelWidth = Math.max(...rows.map(({ label }) => label.length + 1));
+	const lines = rows.map(({ label, value }) => {
+		const head = statRowHead(label, labelWidth);
+		return head && theme ? theme.fg("muted", head) + value : head + value;
+	});
+	// One blank column of breathing room on each side of the content. A titled
+	// frame keeps a minimum width even for short cards, but still clamps to
+	// the terminal; below that the title drops off and the frame hugs content.
+	const contentWidth = Math.max(...lines.map((line) => visibleWidth(line))) + 2;
 	const frameInner = Math.max(
 		0,
-		Math.min(
-			Math.max(...rows.map((row) => visibleWidth(row))) + 2,
-			Math.max(0, outer - 2),
-		),
+		Math.min(Math.max(contentWidth, TITLE_MIN_FRAME), Math.max(0, outer - 2)),
 	);
 	const horizontal = FRAME_HORIZONTAL.repeat(frameInner);
-	const body = rows.map((row) => {
-		// sliceByColumn cuts without appending SGR resets, keeping raw lengths equal
-		// to visible widths for the padding math below.
-		const cell = sliceByColumn(row, 0, Math.max(0, frameInner - 2));
+	const rightDashes = frameInner - CARD_TITLE.length - MIN_TITLE_DASHES;
+	let top = pad + FRAME_TOP_LEFT + horizontal + FRAME_TOP_RIGHT;
+	if (rightDashes >= MIN_TITLE_DASHES) {
+		const label = theme ? theme.fg("muted", CARD_TITLE) : CARD_TITLE;
+		top =
+			pad +
+			FRAME_TOP_LEFT +
+			FRAME_HORIZONTAL.repeat(MIN_TITLE_DASHES) +
+			label +
+			FRAME_HORIZONTAL.repeat(rightDashes) +
+			FRAME_TOP_RIGHT;
+	}
+	const blank = `${pad}${FRAME_VERTICAL}${" ".repeat(frameInner)}${FRAME_VERTICAL}`;
+	const body = lines.map((line) => {
+		// ANSI-aware: sliceByColumn keeps SGR codes intact, and visibleWidth
+		// measures styled text by its terminal columns.
+		const cell = sliceByColumn(line, 0, Math.max(0, frameInner - 2));
 		const filler = " ".repeat(Math.max(0, frameInner - 1 - visibleWidth(cell)));
 		return `${pad}${FRAME_VERTICAL} ${cell}${filler}${FRAME_VERTICAL}`;
 	});
 	return [
-		pad + FRAME_TOP_LEFT + horizontal + FRAME_TOP_RIGHT,
+		top,
+		blank,
 		...body,
+		blank,
 		pad + FRAME_BOTTOM_LEFT + horizontal + FRAME_BOTTOM_RIGHT,
 	];
 }
 
 export class StatsView implements Component {
 	private readonly data: SessionStats;
+	private readonly theme?: StatsTheme;
 	private cachedWidth = -1;
 	private cachedLines: string[] | undefined;
 
-	constructor(data: SessionStats | undefined) {
+	constructor(data: SessionStats | undefined, theme?: StatsTheme) {
 		this.data = data ?? EMPTY_STATS;
+		this.theme = theme;
 	}
 
 	render(width: number): string[] {
 		if (this.cachedWidth === width && this.cachedLines) return this.cachedLines;
 		this.cachedWidth = width;
-		this.cachedLines = paintStatsView(this.data, width);
+		this.cachedLines = paintStatsView(this.data, width, this.theme);
 		return this.cachedLines;
 	}
 
@@ -229,7 +276,9 @@ export function installStats(pi: ExtensionAPI): void {
 		manager = undefined;
 	});
 
-	pi.registerEntryRenderer<SessionStats>(STATS_CUSTOM_TYPE, (entry) => new StatsView(entry.data));
+	pi.registerEntryRenderer<SessionStats>(STATS_CUSTOM_TYPE, (entry, _options, theme) => {
+		return new StatsView(entry.data, theme);
+	});
 
 	pi.registerCommand("stats", {
 		description: DESCRIPTION,
