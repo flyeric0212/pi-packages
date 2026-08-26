@@ -30,3 +30,5 @@ export const TPS_DISPLAY_MIN_MS = 1000;
 export const TPS_DISPLAY_INTERVAL_MS = 1000;
 /** Live footer ignores integer moves smaller than this; finish still publishes. */
 export const TPS_DISPLAY_HYSTERESIS = 2;
+/** Footer recomputes its O(session-size) context estimate at most once per this interval while frames stream. */
+export const CONTEXT_COMPUTE_MIN_INTERVAL_MS = 200;

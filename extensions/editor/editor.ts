@@ -60,7 +60,8 @@ export function fillRow(line: string, width: number, bg: string, measure: (text:
 	if (current > width) fitted = truncateToWidth(line, width, "");
 	else if (current < width) fitted = `${line}${" ".repeat(width - current)}`;
 	if (bg === "" || bg === RESET_BG) return fitted;
-	const withBg = fitted.replace(/\x1b\[0m/g, `\x1b[0m${bg}`);
+	// SGR full resets: long (`ESC[0m`) and short (`ESC[m`) forms are equivalent; re-arm the fill on either.
+	const withBg = fitted.replace(/\x1b\[0?m/g, `\x1b[0m${bg}`);
 	return `${bg}${withBg}${RESET_BG}`;
 }
 
@@ -87,6 +88,13 @@ export function shouldAcceptSlashCompletionOnly(prefix: string, selectedValue: s
 	return typed !== selectedValue;
 }
 
+/**
+ * Controlled internal probe for "Enter completes a partial pick without
+ * submitting": `autocompletePrefix` / `autocompleteList` are TS-private in
+ * pi-tui's Editor (only `isShowingAutocomplete()` is public as of Pi 0.84.2).
+ * Read-only, guarded, and degrades to native Enter on any upstream shape
+ * change. Re-verify after Pi upgrades (AGENTS.md rules 1–2).
+ */
 export function slashAutocompleteSelection(editor: Editor): { prefix: string; value: string } | undefined {
 	try {
 		if (!editor.isShowingAutocomplete()) return undefined;

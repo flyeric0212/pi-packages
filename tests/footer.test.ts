@@ -490,6 +490,107 @@ describe("footer memo", () => {
 	});
 });
 
+describe("footer memo time clamp", () => {
+	function tickingMemo(now: { value: number }): Memo<number> {
+		return new Memo<number>({ minIntervalMs: 200, now: () => now.value });
+	}
+
+	it("serves identical fingerprints for free regardless of the clock", () => {
+		const clock = { value: 0 };
+		const memo = tickingMemo(clock);
+		let computes = 0;
+		const compute = (): number => {
+			computes += 1;
+			return computes;
+		};
+		assert.equal(memo.get("a", compute), 1);
+		clock.value = 10_000;
+		assert.equal(memo.get("a", compute), 1);
+		assert.equal(computes, 1);
+	});
+
+	it("keeps the previous value inside the window without adopting the new key", () => {
+		const clock = { value: 0 };
+		const memo = tickingMemo(clock);
+		let computes = 0;
+		const compute = (): number => {
+			computes += 1;
+			return computes;
+		};
+		assert.equal(memo.get("a", compute), 1);
+		clock.value = 100;
+		assert.equal(memo.get("b", compute), 1);
+		assert.equal(computes, 1);
+		// The old key is kept, so the first frame after the window recomputes.
+		clock.value = 250;
+		assert.equal(memo.get("b", compute), 2);
+		assert.equal(computes, 2);
+	});
+
+	it("recomputes immediately once the window has elapsed", () => {
+		const clock = { value: 0 };
+		const memo = tickingMemo(clock);
+		let computes = 0;
+		const compute = (): number => {
+			computes += 1;
+			return computes;
+		};
+		memo.get("a", compute);
+		clock.value = 201;
+		assert.equal(memo.get("b", compute), 2);
+		assert.equal(computes, 2);
+	});
+
+	it("never caches an undefined key even inside the window", () => {
+		const clock = { value: 0 };
+		const memo = tickingMemo(clock);
+		let computes = 0;
+		const compute = (): number => {
+			computes += 1;
+			return computes;
+		};
+		assert.equal(memo.get(undefined, compute), 1);
+		clock.value = 10;
+		assert.equal(memo.get(undefined, compute), 2);
+		// The undefined-key recompute refreshed the throttle (at most one
+		// compute per interval, whatever triggered it), so a keyed change
+		// right after it is clamped too.
+		clock.value = 20;
+		assert.equal(memo.get("a", compute), 2);
+		clock.value = 250;
+		assert.equal(memo.get("a", compute), 3);
+		assert.equal(computes, 3);
+	});
+
+	it("skips the clamp when the injected clock moves backwards", () => {
+		const clock = { value: 1000 };
+		const memo = tickingMemo(clock);
+		let computes = 0;
+		const compute = (): number => {
+			computes += 1;
+			return computes;
+		};
+		memo.get("a", compute);
+		clock.value = 900; // non-monotonic fallback clocks can jump backwards
+		assert.equal(memo.get("b", compute), 2); // recompute, do not extend staleness
+		assert.equal(computes, 2);
+	});
+
+	it("skips the window entirely when clamping is off for the call", () => {
+		const clock = { value: 0 };
+		const memo = tickingMemo(clock);
+		let computes = 0;
+		const compute = (): number => {
+			computes += 1;
+			return computes;
+		};
+		assert.equal(memo.get("a", compute, true), 1);
+		clock.value = 50; // inside the window, but the caller turned clamping off
+		assert.equal(memo.get("b", compute, false), 2);
+		assert.equal(computes, 2);
+	});
+});
+
 describe("footer render frames reuse the branch scan", () => {
 	it("keeps getBranch out of streaming frames whose facts did not change", () => {
 		let branchScans = 0;

@@ -18,6 +18,17 @@ export type PromptCacheUsage = {
 	cacheWrite?: number;
 };
 
+/**
+ * Injectable clock used wherever elapsed time is measured (token speed,
+ * footer memos). Defaults to `defaultNow`; tests pass a deterministic fake.
+ */
+export type NowFn = () => number;
+
+/** Monotonic when the platform provides performance; Date.now otherwise. */
+export function defaultNow(): number {
+	return typeof performance !== "undefined" ? performance.now() : Date.now();
+}
+
 export function formatTokens(n: number): string {
 	if (!Number.isFinite(n) || n < 0) return UNKNOWN;
 	if (n < 1000) return String(Math.round(n));

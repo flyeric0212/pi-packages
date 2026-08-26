@@ -5,8 +5,7 @@ import {
 	TPS_MAX_PLAUSIBLE,
 	TPS_MIN_ACTIVE_MS,
 } from "./config.ts";
-
-export type NowFn = () => number;
+import { defaultNow, type NowFn } from "./utils.ts";
 
 export type TokenSpeedSnapshot = {
 	tps: number | null;
@@ -17,6 +16,17 @@ export type OutputUsage = {
 	output?: number;
 	reasoning?: number;
 };
+
+function outputTokens(usage: OutputUsage | undefined): number {
+	const output = usage?.output;
+	if (output == null || !Number.isFinite(output) || output <= 0) return 0;
+	return output;
+}
+
+export function displayedTps(tps: number | null): number | null {
+	if (tps == null || !Number.isFinite(tps)) return null;
+	return Math.round(tps);
+}
 
 /**
  * Wall-clock delivery rate of one assistant message.
@@ -33,21 +43,6 @@ export type OutputUsage = {
  * moves smaller than TPS_DISPLAY_HYSTERESIS. finish() publishes the measured
  * value immediately.
  */
-function defaultNow(): number {
-	return typeof performance !== "undefined" ? performance.now() : Date.now();
-}
-
-function outputTokens(usage: OutputUsage | undefined): number {
-	const output = usage?.output;
-	if (output == null || !Number.isFinite(output) || output <= 0) return 0;
-	return output;
-}
-
-export function displayedTps(tps: number | null): number | null {
-	if (tps == null || !Number.isFinite(tps)) return null;
-	return Math.round(tps);
-}
-
 export class TokenSpeedEngine {
 	private streaming = false;
 	private finished = false;

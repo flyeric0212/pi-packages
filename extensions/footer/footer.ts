@@ -1,5 +1,5 @@
 import { type Theme, type ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { CHROME_LEFT_PAD, FOOTER_SEPARATOR, STATUS_SEPARATOR } from "../config.ts";
+import { CHROME_LEFT_PAD, CONTEXT_COMPUTE_MIN_INTERVAL_MS, FOOTER_SEPARATOR, STATUS_SEPARATOR } from "../config.ts";
 import {
 	assistantCacheUsages,
 	cacheHitTone,
@@ -7,6 +7,7 @@ import {
 	contextTone,
 	ellipsizeMiddle,
 	fallbackIfStale,
+	defaultNow,
 	finiteOrZero,
 	formatCacheHit,
 	formatContextUsage,
@@ -22,6 +23,7 @@ import {
 	thinkingLevelLabel,
 	type CacheTone,
 	type ContextTone,
+	type NowFn,
 } from "../utils.ts";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { type CraftStore } from "../state.ts";
@@ -159,18 +161,46 @@ export function contextMemoKey(facts: LeafFacts | undefined, modelId: string | u
  * Value memo keyed by an optional fingerprint; `undefined` key never caches.
  * A computed `undefined` value is still cached (a fingerprint match means the
  * value cannot have changed, whatever it is).
+ *
+ * With `minIntervalMs`, a changed fingerprint inside the clamp window serves
+ * the previous value AND keeps the previous key, so the first frame after the
+ * window sees a stale fingerprint and recomputes — staleness stays bounded by
+ * the window instead of being adopted permanently. The window applies by
+ * default; passing `clamp = false` for a call (e.g. once frames stop
+ * streaming) makes it recompute exactly on fingerprint change.
  */
 export class Memo<T> {
 	private key: string | undefined;
 	private hasValue = false;
 	private value: T | undefined;
+	private computedAt = 0;
+	private readonly minIntervalMs: number;
+	private readonly now: NowFn;
 
-	get(key: string | undefined, compute: () => T): T {
+	constructor(options?: { minIntervalMs?: number; now?: NowFn }) {
+		this.minIntervalMs = Math.max(0, options?.minIntervalMs ?? 0);
+		this.now = options?.now ?? defaultNow;
+	}
+
+	get(key: string | undefined, compute: () => T, clamp = true): T {
+		// Same fingerprint: the value cannot have changed — free exact hit.
 		if (key !== undefined && this.hasValue && this.key === key) return this.value as T;
+		// Changed fingerprint inside the window: serve the old value and keep
+		// the OLD key so the first frame after the window recomputes. Adopting
+		// the new key here would pin the stale value forever. Negative elapsed
+		// (non-monotonic fallback clock jumped backwards) skips the clamp:
+		// degrade to recompute-per-frame, never extend the stale window.
+		let clamped = false;
+		if (clamp && this.hasValue && this.minIntervalMs > 0) {
+			const elapsed = this.now() - this.computedAt;
+			clamped = elapsed >= 0 && elapsed < this.minIntervalMs;
+		}
+		if (key !== undefined && clamped) return this.value as T;
 		const next = compute();
 		this.key = key;
 		this.value = next;
 		this.hasValue = true;
+		this.computedAt = this.now();
 		return next;
 	}
 }
@@ -319,7 +349,9 @@ export function installFooter(ctx: ExtensionContext, store: CraftStore): void {
 	ctx.ui.setFooter((tui, _theme, footerData) => {
 		const cache: { lines?: string[] } = {};
 		const cacheHitMemo = new Memo<number | null>();
-		const contextMemo = new Memo<ReturnType<ExtensionContext["getContextUsage"]>>();
+		const contextMemo = new Memo<ReturnType<ExtensionContext["getContextUsage"]>>({
+			minIntervalMs: CONTEXT_COMPUTE_MIN_INTERVAL_MS,
+		});
 		const unsubscribe = store.subscribe(() => tui.requestRender());
 		return {
 			dispose: unsubscribe,
@@ -336,7 +368,13 @@ export function installFooter(ctx: ExtensionContext, store: CraftStore): void {
 							cacheHitMemoKey(leaf),
 							() => cumulativeCacheHitRate(assistantCacheUsages(ctx.sessionManager.getBranch())),
 						);
-						const usage = contextMemo.get(contextMemoKey(leaf, ctx.model?.id), () => ctx.getContextUsage());
+						// Clamp only while frames stream; at rest every fingerprint change recomputes
+						// exactly, so the value shown when the agent finishes is never window-stale.
+						const usage = contextMemo.get(
+							contextMemoKey(leaf, ctx.model?.id),
+							() => ctx.getContextUsage(),
+							snap.tps.streaming,
+						);
 						return renderFooter(
 							{
 								modelName: ctx.model?.name ?? snap.modelName,
