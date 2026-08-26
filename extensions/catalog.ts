@@ -27,6 +27,7 @@ export const RESERVED_COMMAND_NAMES: ReadonlySet<string> = new Set([
 	"llama",
 	"clear",
 	"cls",
+	"stats",
 ]);
 
 export type CommandRecord = {

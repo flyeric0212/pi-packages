@@ -55,6 +55,7 @@ pi -e git:github.com/flyeric0212/pi-craft-tui
 **交互**
 
 - **`/clear` 与 `/cls`** —— 仅视觉填满视口；不触碰会话
+- **`/stats`** —— 会话统计卡：token 汇总（↑↓R/W Σ）、缓存命中、轮次与时长
 - **技能短命令** —— `/name` 运行已加载的 skill（等同 `/skill:name`）；补全菜单显示短名
 - **斜杠命令** —— 行首命令名用主题强调色；Enter 在部分匹配时只补全，打全了才提交
 

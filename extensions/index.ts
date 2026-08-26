@@ -1,5 +1,6 @@
 import { VERSION, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { installClear } from "./commands/clear.ts";
+import { installStats } from "./commands/stats.ts";
 import { installEditor, prefixUserPrompt } from "./editor/editor.ts";
 import { installFooter } from "./footer/footer.ts";
 import { installHeader } from "./header/header.ts";
@@ -40,6 +41,7 @@ export default function (pi: ExtensionAPI): void {
 	const getSkillCatalog = (): SkillCatalog => skillCatalog ?? (skillCatalog = buildSkillCatalog(pi.getCommands()));
 
 	installClear(pi);
+	installStats(pi);
 	installSkillShortcuts(pi, getSkillCatalog);
 
 	pi.registerMarkdownTransformer((markdown, { messageType }) => {

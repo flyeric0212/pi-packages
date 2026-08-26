@@ -55,6 +55,7 @@ Then start a new Pi session or run `/reload`. This package does not write `setti
 **Interaction**
 
 - **`/clear` & `/cls`** — fill the viewport visually; session untouched
+- **`/stats`** — session card: token totals (↑↓R/W Σ), cache hit, turns, elapsed time
 - **Skill shortcuts** — `/name` runs a loaded skill (same as `/skill:name`); completion menus show short names
 - **Slash commands** — leading command painted in theme accent; Enter completes a partial pick and submits only on exact match
 
