@@ -10,6 +10,20 @@
 
 先用 `pi config` 关掉其他 TUI。
 
+### 本地扩展目录
+
+把本包放到 Pi 的自动发现位置：
+
+```text
+# 全局默认（未设置 PI_CODING_AGENT_DIR 时）
+~/.pi/agent/extensions/pi-craft-tui
+
+# 仅当前项目
+.pi/extensions/pi-craft-tui
+```
+
+### Git 仓库
+
 安装到当前用户：
 
 ```bash

@@ -10,6 +10,20 @@ A [Pi](https://pi.dev/) package that gives the TUI a Claude Code-style header, C
 
 Use `pi config` to disable other TUI packages first.
 
+### Local extension folder
+
+Place this folder in one of Pi's auto-discovery locations:
+
+```text
+# Global default (when PI_CODING_AGENT_DIR is unset)
+~/.pi/agent/extensions/pi-craft-tui
+
+# Project-specific
+.pi/extensions/pi-craft-tui
+```
+
+### Git repository
+
 Install for your user:
 
 ```bash
