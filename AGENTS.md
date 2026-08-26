@@ -15,8 +15,6 @@ One folder per feature under `extensions/` (header, editor, footer, commands), w
 
 ## Rules
 
-1. Only use Pi's public APIs. Never take over UI slots, commands, or tools that Pi or other extensions own, and re-check after Pi upgrades.
-2. Keep formatting/layout logic pure and tested; UI components stay thin.
-3. Never modify Pi's settings or clear the terminal — `/clear` only fills the viewport visually, without touching the session.
-4. The footer is always a single line in fixed slot order (model+thinking, context, cwd, tps, cache). Other extensions' temporary statuses render on the line above.
-5. Clean up fully on session end: no duplicate installs or leftover timers after `/new`, `/resume`, or `/reload`.
+1. **Pi-native first.** Use only public APIs; wrap or compose native components instead of rebuilding them; take over no UI slots, commands, or tools owned by Pi or other extensions; touch nothing beyond what a feature requires — Pi's settings and session state stay untouched.
+2. **Stay compatible.** Depend only on the stable public surface, keep installs fully reversible, and re-verify against Pi after every upgrade.
+3. **Keep overhead near zero.** Formatting stays pure and reuses computed results (interned lines, fingerprint-keyed memos); high-frequency paths throttle; sessions build lazily and clean up fully on `/new`, `/resume`, `/reload`. Even necessary costs are minimized and documented (code comment or ADR).

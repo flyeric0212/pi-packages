@@ -46,12 +46,23 @@ Then start a new Pi session or run `/reload`. This package does not write `setti
 
 ## Features
 
-- Header: animated Pi logo (once per new process), version, slogan, model, thinking effort, and project directory
-- Editor: Codex-style filled input with a bold `❯`
-- Footer: `model high · 126k/400k · cwd · tok/s · CH87.3%`; cache hit is the branch-cumulative rate, last, and hidden until a cache read; other extensions' `setStatus()` text appears on the line above
-- `/clear` and `/cls` clear the screen only
-- `/skill-name` runs a loaded skill (same as `/skill:skill-name`)
-- Slash commands: the command name uses the theme accent; Enter completes a partial pick and only submits when the typed name already matches
+**UI**
+
+- **Header** — animated π logo (once per process), version, slogan, model, thinking effort, project directory
+- **Editor** — Codex-style filled input with a bold `❯`; history keeps the same marker; `!` flips it to the bash-mode color
+- **Footer** — one line: `model high · 126k/400k · cwd · tok/s · CH87.3%`; other extensions' statuses render on the line above
+
+**Interaction**
+
+- **`/clear` & `/cls`** — fill the viewport visually; session untouched
+- **Skill shortcuts** — `/name` runs a loaded skill (same as `/skill:name`); completion menus show short names
+- **Slash commands** — leading command painted in theme accent; Enter completes a partial pick and submits only on exact match
+
+## Principles
+
+- **Pi-native first.** Public APIs only; native components are wrapped or composed, never rebuilt; UI slots, commands, and tools owned by Pi or other extensions stay untouched.
+- **Stay compatible.** Only the stable public surface, fully reversible installs, re-verified against every Pi upgrade.
+- **Keep overhead near zero.** Pure formatting with reused results, throttled high-frequency paths, lazy per-session work and full cleanup; even necessary costs are minimized and documented.
 
 ## License
 
