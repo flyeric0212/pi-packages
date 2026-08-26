@@ -4,7 +4,6 @@ import { installEditor, prefixUserPrompt } from "./editor/editor.ts";
 import { installFooter } from "./footer/footer.ts";
 import { installHeader } from "./header/header.ts";
 import { installSkillShortcuts } from "./skill-shortcuts/skill-shortcuts.ts";
-import { installToolPreview } from "./tool-preview/tool-preview.ts";
 import { buildSkillCatalog, type SkillCatalog } from "./catalog.ts";
 import { CraftStore } from "./state.ts";
 import {
@@ -42,7 +41,6 @@ export default function (pi: ExtensionAPI): void {
 
 	installClear(pi);
 	installSkillShortcuts(pi, getSkillCatalog);
-	installToolPreview(pi);
 
 	pi.registerMarkdownTransformer((markdown, { messageType }) => {
 		if (messageType !== "user") return markdown;

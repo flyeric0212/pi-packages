@@ -11,7 +11,7 @@ npm run typecheck # type-check the code
 
 ## Code layout
 
-One folder per feature under `extensions/` (header, editor, footer, clear, skill-shortcuts, tool-preview), with shared state in `state.ts`, constants in `config.ts`, and pure formatting helpers in `utils.ts`. Tests live in `tests/`.
+One folder per feature under `extensions/` (header, editor, footer, clear, skill-shortcuts), with shared state in `state.ts`, constants in `config.ts`, and pure formatting helpers in `utils.ts`. Tests live in `tests/`.
 
 ## Rules
 

@@ -38,8 +38,6 @@ Then start a new Pi session or run `/reload`. This package does not write `setti
 - `/clear` and `/cls` clear the screen only
 - `/skill-name` runs a loaded skill (same as `/skill:skill-name`)
 - Slash commands: the command name uses the theme accent; Enter completes a partial pick and only submits when the typed name already matches
-- A collapsed successful `read` stays one unboxed line
-- Tool preview re-registers `read` only while that name is still owned by Pi. After upgrading Pi, re-check its output.
 
 ## License
 
