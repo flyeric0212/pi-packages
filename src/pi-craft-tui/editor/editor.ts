@@ -48,10 +48,18 @@ export function replaceBorderGlyphs(line: string): string {
 	return line.replaceAll(BORDER_GLYPH, " ");
 }
 
-export function insertPrompt(line: string, prompt: string, leftPad = PROMPT_LEFT_PAD): string {
+export function insertPrompt(
+	line: string,
+	prompt: string,
+	gutterCols = PROMPT_GUTTER_COLS,
+	leftPad = PROMPT_LEFT_PAD,
+): string {
+	const promptWidth = visibleWidth(prompt);
+	const gap = Math.max(1, gutterCols - leftPad - promptWidth);
+	const prefix = " ".repeat(leftPad) + prompt + " ".repeat(gap);
 	const width = visibleWidth(line);
-	const padded = width >= leftPad ? line : " ".repeat(leftPad - width) + line;
-	return " ".repeat(leftPad) + prompt + sliceByColumn(padded, leftPad, Math.max(0, visibleWidth(padded) - leftPad));
+	const padded = width >= gutterCols ? line : line + " ".repeat(gutterCols - width);
+	return prefix + sliceByColumn(padded, gutterCols, Math.max(0, visibleWidth(padded) - gutterCols));
 }
 
 export function fillRow(line: string, width: number, bg: string, measure: (text: string) => number = visibleWidth): string {

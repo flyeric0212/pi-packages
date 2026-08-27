@@ -17,7 +17,7 @@ export const PROMPT_CHAR = "❯";
 /** Shared left inset for the prompt glyph and the footer metrics. */
 export const CHROME_LEFT_PAD = 1;
 export const PROMPT_LEFT_PAD = CHROME_LEFT_PAD;
-export const PROMPT_GUTTER_COLS = 2;
+export const PROMPT_GUTTER_COLS = 3;
 export const FOOTER_SEPARATOR = " · ";
 export const STATUS_SEPARATOR = " · ";
 /** Generation time below this is clock/batching noise, not a measurable rate. */

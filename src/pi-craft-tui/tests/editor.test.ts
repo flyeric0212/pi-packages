@@ -45,8 +45,24 @@ describe("CraftEditor layout helpers", () => {
 		assert.equal(prefixUserPrompt(""), "❯");
 	});
 
-	it("keeps one column of left padding before the prompt", () => {
-		assert.equal(insertPrompt("  hello", "❯"), " ❯ hello");
+	it("keeps one column of left padding and aligns content with gutter", () => {
+		assert.equal(insertPrompt("   hello", "❯"), " ❯ hello");
+	});
+
+	it("aligns multiline editor content vertically", () => {
+		const multilineFrame = ["────────", "   first line", "   second line", "────────"];
+		const painted = paintCraftEditor(multilineFrame, {
+			width: 25,
+			text: "first line\nsecond line",
+			bg: "",
+			prompt: "❯",
+			accent: "",
+		});
+		assert.equal(painted[1], " ❯ first line");
+		assert.equal(painted[2], "   second line");
+		// Check that both lines start text at column index 3
+		assert.equal(painted[1]?.indexOf("first"), 3);
+		assert.equal(painted[2]?.indexOf("second"), 3);
 	});
 
 	it("clamps a full-width prompt row so inserting ❯ does not overflow", () => {
@@ -150,7 +166,7 @@ describe("slash Enter vs completion", () => {
 });
 
 describe("editor chrome probe", () => {
-	const frame = ["────────", "  hello", "────────", "/clear", "item"];
+	const frame = ["────────", "   hello", "────────", "/clear", "item"];
 
 	it("finds the panel bottom and leaves the autocomplete rows below it", () => {
 		assert.deepEqual(inspectEditorChrome(frame), { contentIndex: 1, bottomIndex: 2 });
@@ -177,7 +193,7 @@ describe("editor chrome probe", () => {
 	});
 
 	it("strips chrome ─ but keeps box-drawing in the typed content", () => {
-		const painted = paintCraftEditor(["────────", "  a─b", "  ────", "────────", "/clear"], {
+		const painted = paintCraftEditor(["────────", "   a─b", "   ────", "────────", "/clear"], {
 			width: 20,
 			text: "a─b\n────",
 			bg: "",
@@ -186,14 +202,14 @@ describe("editor chrome probe", () => {
 		});
 		assert.ok(!painted[0]!.includes("─"));
 		assert.match(painted[1]!, /a─b/);
-		assert.equal(painted[2], "  ────");
+		assert.equal(painted[2], "   ────");
 		assert.ok(!painted[3]!.includes("─"));
 		assert.equal(painted[4], "/clear");
 	});
 
 	it("still fills content rows after leaving content glyphs alone", () => {
 		const bg = "\x1b[48;2;1;2;3m";
-		const painted = paintCraftEditor(["────────", "  a─b", "────────"], {
+		const painted = paintCraftEditor(["────────", "   a─b", "────────"], {
 			width: 12,
 			text: "a─b",
 			bg,
