@@ -41,6 +41,46 @@ Then start a new Pi session or run `/reload`.
 - **Skill shortcuts** — `/name` runs a loaded skill (same as `/skill:name`); completion menus show short names
 - **Slash commands** — leading command painted in theme accent; Enter completes a partial pick and submits only on exact match
 
+## pi-simple-permission Features
+
+A lightweight, deterministic, and transparent permission guard for Pi. Eliminates false-positive blocks on command wrappers (like `xargs`) and prevents annoying Subagent prompt interruptions.
+
+> Currently targets Unix-like Bash environments such as macOS and Linux; native Windows PowerShell command checks are not yet supported.
+
+- **Deterministic Rule Matching** — Wildcard (`*`) support with strict regex escaping and later-rule precedence (`findLast`).
+- **Layered Wrapper Checks** — Recognizes common wrappers such as `xargs`, `sudo`, `env`, `timeout`, and shell `-c`; safe batches stay silent while dangerous inner commands still match policy.
+- **Compound Command Checks** — Reviews pipelines, chained/background commands, and executable substitutions while ignoring single-quoted or escaped text.
+- **Sensitive Path Protection** — Normalizes `~`, model-generated `@`, and relative paths for direct file tools, with explicit exemptions such as `*.env.example`.
+- **Layered JSON Configuration** — Merges built-in defaults, global policy, and trusted project policy; invalid files produce diagnostics instead of silently opening access.
+
+### Configuration Example (`config.json`)
+
+```json
+{
+  "permission": {
+    "*": "allow",
+    "path": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow"
+    },
+    "bash": {
+      "*": "allow",
+      "rm -rf *": "deny",
+      "sudo *": "ask",
+      "git push*": "ask"
+    },
+    "external_directory": {
+      "*": "allow",
+      "~/.ssh/*": "deny"
+    }
+  }
+}
+```
+
+Later specific rules win within a category, while exact `"*"` is always the fallback. Project policy is loaded only after Pi trusts the project. This extension is a lightweight accident-prevention policy, not a complete shell parser or sandbox; path rules cover direct file tools, while Bash and symlink isolation require a separate sandbox.
+
 ## Principles
 
 - **Pi-native first.** Public APIs only; native components are wrapped or composed, never rebuilt; UI slots, commands, and tools owned by Pi or other extensions stay untouched.

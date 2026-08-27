@@ -1,0 +1,27 @@
+{
+  "permission": {
+    "*": "allow",
+
+    "path": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow",
+      "*.env.development": "allow"
+    },
+
+    "bash": {
+      "*": "allow",
+      "rm -rf *": "deny",
+      "sudo *": "ask",
+      "git push*": "ask",
+      "*gradlew*bootRun*": "ask",
+      "pnpm dev*": "ask"
+    },
+
+    "external_directory": {
+      "*": "allow",
+      "~/.ssh/*": "deny"
+    }
+  }
+}
