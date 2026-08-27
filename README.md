@@ -1,50 +1,32 @@
-# pi-craft-tui
+# pi-packages
 
 English | [简体中文](./README.zh-CN.md)
 
-A [Pi](https://pi.dev/) package that gives the TUI a Claude Code-style header, Codex-style input, and a single-line metrics footer. Requires Pi **0.84.2** or newer.
+A modular collection of extensions for [Pi](https://pi.dev/).
 
-![Overview](./assets/overview.png)
+## Packages
+
+- **`pi-craft-tui`** (`src/pi-craft-tui`) — Claude Code-style header, Codex-style input, and a single-line metrics footer.
+- **`pi-simple-permission`** (`src/pi-simple-permission`) — Lightweight permission guard extension for Pi.
 
 ## Install
 
-Use `pi config` to disable other TUI packages first.
-
-### Local extension folder
-
-Place this folder in one of Pi's auto-discovery locations:
-
-```text
-# Global default (when PI_CODING_AGENT_DIR is unset)
-~/.pi/agent/extensions/pi-craft-tui
-
-# Project-specific
-.pi/extensions/pi-craft-tui
-```
-
-### Git repository
-
-Install for your user:
+Use `pi config` to disable conflicting packages first.
 
 ```bash
-pi install git:github.com/flyeric0212/pi-craft-tui
+# 1. Clone repository
+git clone https://github.com/flyeric0212/pi-packages.git /path/to/pi-packages
+
+# 2. Install extensions
+pi install /path/to/pi-packages/src/pi-craft-tui
+pi install /path/to/pi-packages/src/pi-simple-permission
 ```
 
-Or only for the current project:
+Then start a new Pi session or run `/reload`.
 
-```bash
-pi install -l git:github.com/flyeric0212/pi-craft-tui
-```
+## pi-craft-tui Features
 
-Try it for one run without installing:
-
-```bash
-pi -e git:github.com/flyeric0212/pi-craft-tui
-```
-
-Then start a new Pi session or run `/reload`. This package does not write `settings.json` or set `quietStartup`.
-
-## Features
+![Overview](./assets/overview.png)
 
 **UI**
 

@@ -1,50 +1,32 @@
-# pi-craft-tui
+# pi-packages
 
 [English](./README.md) | 简体中文
 
-给 [Pi](https://pi.dev/) TUI 换上 Claude Code 风格的 Header、Codex 风格的输入区和单行 Footer。需要 Pi **0.84.2** 或更高版本。
+适用于 [Pi](https://pi.dev/) 的模块化扩展插件合集。
 
-![总览](./assets/overview.png)
+## 包含的 Packages
+
+- **`pi-craft-tui`** (`src/pi-craft-tui`) —— Claude Code 风格 Header、Codex 风格输入区与单行 Footer 状态栏。
+- **`pi-simple-permission`** (`src/pi-simple-permission`) —— 轻量权限拦截与守护扩展。
 
 ## 安装
 
-先用 `pi config` 关掉其他 TUI。
-
-### 本地扩展目录
-
-把本包放到 Pi 的自动发现位置：
-
-```text
-# 全局默认（未设置 PI_CODING_AGENT_DIR 时）
-~/.pi/agent/extensions/pi-craft-tui
-
-# 仅当前项目
-.pi/extensions/pi-craft-tui
-```
-
-### Git 仓库
-
-安装到当前用户：
+先用 `pi config` 关掉其他冲突的扩展（如其他 TUI）。
 
 ```bash
-pi install git:github.com/flyeric0212/pi-craft-tui
+# 1. 克隆仓库
+git clone https://github.com/flyeric0212/pi-packages.git /path/to/pi-packages
+
+# 2. 安装扩展
+pi install /path/to/pi-packages/src/pi-craft-tui
+pi install /path/to/pi-packages/src/pi-simple-permission
 ```
 
-只安装到当前项目：
+然后新开一个 Pi 会话，或执行 `/reload`。
 
-```bash
-pi install -l git:github.com/flyeric0212/pi-craft-tui
-```
+## pi-craft-tui 功能介绍
 
-不安装、只跑一次：
-
-```bash
-pi -e git:github.com/flyeric0212/pi-craft-tui
-```
-
-然后新开一个 Pi 会话，或执行 `/reload`。本包不会写入 `settings.json`，也不会改 `quietStartup`。
-
-## 功能介绍
+![总览](./assets/overview.png)
 
 **界面**
 
