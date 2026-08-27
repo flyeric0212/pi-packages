@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { CHROME_LEFT_PAD } from "../extensions/config.ts";
+import { CHROME_LEFT_PAD } from "../config.ts";
 import {
 	ClearView,
 	CLS_CHROME_ROWS,
@@ -13,8 +13,8 @@ import {
 	shouldFillViewport,
 	spacerRows,
 	type ClearBranchEntry,
-} from "../extensions/commands/clear.ts";
-import { fallbackIfStale } from "../extensions/utils.ts";
+} from "../commands/clear.ts";
+import { fallbackIfStale } from "../utils.ts";
 import { visibleWidth } from "@earendil-works/pi-tui";
 
 const theme = {

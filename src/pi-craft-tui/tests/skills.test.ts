@@ -8,8 +8,8 @@ import {
 	isInvocableSlashName,
 	skillShortName,
 	type CommandRecord,
-} from "../extensions/catalog.ts";
-import { rewriteLeadingSkillCommand, shortenSkillSuggestions } from "../extensions/commands/skill-shortcuts.ts";
+} from "../catalog.ts";
+import { rewriteLeadingSkillCommand, shortenSkillSuggestions } from "../commands/skill-shortcuts.ts";
 
 function commands(rows: CommandRecord[]): CommandRecord[] {
 	return rows;

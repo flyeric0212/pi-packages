@@ -17,10 +17,10 @@ import {
 	paintModelThinking,
 	thinkingThemeColor,
 	compactProjectPath,
-} from "../extensions/utils.ts";
+} from "../utils.ts";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { cacheHitMemoKey, contextMemoKey, Memo, readLeafFacts, type LeafFacts } from "../extensions/footer/footer.ts";
-import { FOOTER_SLOT_ORDER, fitFooter, footerSlotText, formatStatusLine, paintFooter, renderFooter } from "../extensions/footer/footer.ts";
+import { cacheHitMemoKey, contextMemoKey, Memo, readLeafFacts, type LeafFacts } from "../footer/footer.ts";
+import { FOOTER_SLOT_ORDER, fitFooter, footerSlotText, formatStatusLine, paintFooter, renderFooter } from "../footer/footer.ts";
 import { visibleWidth } from "@earendil-works/pi-tui";
 
 function stubTheme(): Theme {

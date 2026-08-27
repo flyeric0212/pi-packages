@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { TokenSpeedEngine } from "../extensions/token-speed.ts";
+import { TokenSpeedEngine } from "../token-speed.ts";
 
 describe("TokenSpeedEngine", () => {
 	it("reports no data before any generation has been measured", () => {

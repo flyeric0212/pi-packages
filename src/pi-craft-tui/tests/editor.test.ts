@@ -4,7 +4,7 @@ import {
 	colorizeLeadingCommand,
 	leadingSlashToken,
 	recognizedLeadingCommand,
-} from "../extensions/editor/command-paint.ts";
+} from "../editor/command-paint.ts";
 import {
 	fillRow,
 	inspectEditorChrome,
@@ -18,9 +18,9 @@ import {
 	shouldAcceptSlashCompletionOnly,
 	slashAutocompleteSelection,
 	typedSlashName,
-} from "../extensions/editor/editor.ts";
+} from "../editor/editor.ts";
 import type { Editor } from "@earendil-works/pi-tui";
-import { buildSkillCatalog } from "../extensions/catalog.ts";
+import { buildSkillCatalog } from "../catalog.ts";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 describe("CraftEditor layout helpers", () => {

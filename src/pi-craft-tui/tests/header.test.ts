@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { HEADER_PAD_Y, LOGO_LEFT_PAD, LOGO_TEXT_GAP } from "../extensions/config.ts";
-import { formatHeaderPath, padHeaderVertically } from "../extensions/header/header.ts";
-import { LAST_LOGO_FRAME, LOGO_CELL, LOGO_ROWS, logoColumnWidth, renderLogoFrame } from "../extensions/header/logo.ts";
+import { HEADER_PAD_Y, LOGO_LEFT_PAD, LOGO_TEXT_GAP } from "../config.ts";
+import { formatHeaderPath, padHeaderVertically } from "../header/header.ts";
+import { LAST_LOGO_FRAME, LOGO_CELL, LOGO_ROWS, logoColumnWidth, renderLogoFrame } from "../header/logo.ts";
 import { visibleWidth } from "@earendil-works/pi-tui";
 
 function stubTheme(): Theme {

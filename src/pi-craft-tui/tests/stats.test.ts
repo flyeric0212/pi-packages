@@ -12,8 +12,8 @@ import {
 	paintStatsView,
 	type SessionStats,
 	type StatsEntry,
-} from "../extensions/commands/stats.ts";
-import { cumulativeCacheHitRate } from "../extensions/utils.ts";
+} from "../commands/stats.ts";
+import { cumulativeCacheHitRate } from "../utils.ts";
 
 function assistantEntry(overrides: {
 	usage?: Record<string, unknown>;

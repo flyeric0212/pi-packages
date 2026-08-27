@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createState, CraftStore, sameCraftState } from "../extensions/state.ts";
-import { internLines, sameLines } from "../extensions/utils.ts";
+import { createState, CraftStore, sameCraftState } from "../state.ts";
+import { internLines, sameLines } from "../utils.ts";
 
 describe("CraftStore", () => {
 	it("does not notify when the displayed snapshot is unchanged", () => {

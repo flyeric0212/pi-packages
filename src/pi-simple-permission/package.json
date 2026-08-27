@@ -1,0 +1,22 @@
+{
+  "name": "pi-simple-permission",
+  "version": "0.1.0",
+  "description": "Simple and lightweight permission guard for Pi coding agent",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "permission"
+  ],
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.84.2"
+  }
+}
