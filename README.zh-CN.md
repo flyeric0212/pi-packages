@@ -8,6 +8,7 @@
 
 - **`pi-craft-tui`** (`src/pi-craft-tui`) —— Claude Code 风格 Header、Codex 风格输入区与单行 Footer 状态栏。
 - **`pi-simple-permission`** (`src/pi-simple-permission`) —— 轻量权限拦截与守护扩展。
+- **`pi-auto-compact`** (`src/pi-auto-compact`) —— 上下文自动压缩扩展，支持真实 Token 压力评估、回合中拦截与自动续跑。
 
 ## 安装
 
@@ -20,6 +21,7 @@ git clone https://github.com/flyeric0212/pi-packages.git /path/to/pi-packages
 # 2. 安装扩展
 pi install /path/to/pi-packages/src/pi-craft-tui
 pi install /path/to/pi-packages/src/pi-simple-permission
+pi install /path/to/pi-packages/src/pi-auto-compact
 ```
 
 然后新开一个 Pi 会话，或执行 `/reload`。
@@ -80,6 +82,34 @@ pi install /path/to/pi-packages/src/pi-simple-permission
 ```
 
 同一分类中后写的具体规则优先，`"*"` 始终只是兜底。项目配置仅在 Pi 信任该项目后加载。该扩展是轻量防误操作规则器，不是完整 Shell 解析器或沙箱；路径规则只覆盖直接文件工具，Bash 和符号链接仍需依赖独立沙箱保护。
+
+## pi-auto-compact 功能介绍
+
+适用于 Pi 的上下文自动压缩扩展，用于控制上下文增长，解决多工具调用的长链路回合（马拉松回合）中上下文暴涨与 Token 成本翻倍问题。
+
+- **真实上下文压力计算** —— 优先使用原生 `totalTokens`，否则按 `input + output + cacheRead + cacheWrite` 计算，完整覆盖缓存命中与 Assistant 输出。
+- **回合中打断与回合间触发** —— `interruptTurn` 开启时通过 `message_end` 拦截马拉松工具链，关闭时仅在 `agent_end` 触发。
+- **压缩后自动续跑** —— 压缩完成后自动注入引导指令，让模型基于摘要无感接续执行当前任务，无需人工手动发消息继续。
+- **多层防抖与熔断保护** —— 包含增长防抖、失败降级（回落前 disarm）与连续 3 次失败熔断，同时保留 Pi 原生 overflow recovery。
+- **分层 JSON 配置与热加载** —— 支持全局配置（`~/.pi/agent/extensions/pi-auto-compact/config.json`）与受信任项目配置（`.pi/pi-auto-compact.json`），支持字段级容错与基于 `mtime` 的热更新。
+
+### 配置文件示例 (`config.json`)
+
+```json
+{
+  "autoCompact": {
+    "enabled": true,
+    "triggerPercent": 80,
+    "debounceTokens": 20000,
+    "interruptTurn": true,
+    "notifyOnly": false,
+    "customInstructions": "Focus the summary on: 1) the current task goal and acceptance criteria; 2) unfinished changes with their exact file paths; 3) key decisions made and the rationale behind them; 4) concrete next steps. Keep <read-files>/<modified-files> complete and accurate. The summary body language may follow the conversation language.",
+    "lang": "zh"
+  }
+}
+```
+
+只需配置需要修改的字段，未声明字段使用默认值。Pi 原生 threshold 压缩始终作为安全兜底，仅在本扩展自己的压缩正在进行时取消；overflow recovery 与手动 `/compact` 保持不变。
 
 ## 设计原则
 

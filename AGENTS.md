@@ -3,6 +3,7 @@
 Pi extension workspace (`pi-packages`) containing multiple modular packages:
 - `pi-craft-tui` (`src/pi-craft-tui`): Claude Code-style header, Codex-style editor, and a single-line metrics footer. Entry point: `src/pi-craft-tui/index.ts`.
 - `pi-simple-permission` (`src/pi-simple-permission`): Simple permission guard extension for Pi. Entry point: `src/pi-simple-permission/index.ts`.
+- `pi-auto-compact` (`src/pi-auto-compact`): Automatic context compaction extension with real token pressure calculation, mid-turn interrupt, and auto-resume. Entry point: `src/pi-auto-compact/index.ts`.
 
 ## Commands
 
@@ -16,6 +17,7 @@ npm run typecheck # type-check the code
 Packages are organized under `src/`:
 - `src/pi-craft-tui/`: TUI styling and interactive enhancements. Internal features structured in folders (`header`, `editor`, `footer`, `commands`), with shared state in `state.ts`, constants in `config.ts`, and pure formatting helpers in `utils.ts`. Tests live in `src/pi-craft-tui/tests/`.
 - `src/pi-simple-permission/`: Permission guard package. Tests live in `src/pi-simple-permission/tests/`.
+- `src/pi-auto-compact/`: Context auto-compaction package. Trigger decision in `trigger.ts`, session state in `state.ts`, and configuration loader in `config.ts`. Tests live in `src/pi-auto-compact/tests/`.
 
 ## Rules
 

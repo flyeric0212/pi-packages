@@ -1,0 +1,23 @@
+{
+  "name": "pi-auto-compact",
+  "version": "0.1.0",
+  "description": "Auto-compact Pi context at a configurable percentage, auto-resume the task, and keep summaries quality-first",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "compaction",
+    "context"
+  ],
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.84.2"
+  }
+}
