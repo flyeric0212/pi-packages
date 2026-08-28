@@ -10,6 +10,7 @@ import {
 } from "../utils.ts";
 import { sliceByColumn, visibleWidth, type Component } from "@earendil-works/pi-tui";
 import { type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import type { AgentDurationSnapshot } from "../metrics/agent-duration.ts";
 
 export const STATS_CUSTOM_TYPE = "craft-stats";
 
@@ -81,6 +82,9 @@ export type SessionStats = {
 	toolFails: Record<string, number>;
 	/** Assistant turns that ended in something other than stop/toolUse. */
 	stops: { aborted: number; length: number; error: number };
+	/** In-memory Agent cycles measured by this extension runtime. */
+	agentDuration?: AgentDurationSnapshot;
+	/** Wall-clock span between the branch's first and last persisted entries. */
 	durationMs: number | null;
 };
 
@@ -193,6 +197,7 @@ export function computeSessionStats(entries: readonly StatsEntry[]): SessionStat
 }
 
 export function formatDuration(ms: number): string {
+	if (ms > 0 && ms < 1000) return "<1s";
 	const totalSeconds = Math.max(0, Math.floor(ms / 1000));
 	const hours = Math.floor(totalSeconds / 3600);
 	const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -200,6 +205,21 @@ export function formatDuration(ms: number): string {
 	if (hours > 0) return `${hours}h ${minutes}m`;
 	if (minutes > 0) return `${minutes}m ${seconds}s`;
 	return `${seconds}s`;
+}
+
+export function formatAgentTiming(timing: AgentDurationSnapshot | undefined): string | undefined {
+	if (
+		!timing ||
+		!Number.isFinite(timing.cycles) ||
+		timing.cycles <= 0 ||
+		timing.lastMs == null ||
+		!Number.isFinite(timing.lastMs) ||
+		timing.lastMs < 0 ||
+		!Number.isFinite(timing.totalMs) ||
+		timing.totalMs < 0
+	) return undefined;
+	const averageMs = timing.totalMs / timing.cycles;
+	return `${timing.cycles} cycles · last ${formatDuration(timing.lastMs)} · avg ${formatDuration(averageMs)} · total ${formatDuration(timing.totalMs)}`;
 }
 
 type StatRow = { label: string; value: string };
@@ -276,7 +296,7 @@ function statRows(stats: SessionStats): StatRow[] {
 		stats.cacheRead,
 	)} W${formatTokens(stats.cacheWrite)} · Σ${formatTokens(stats.total)}`;
 	const cache = formatCacheHit(stats.cacheHitPercent);
-	const turns = `${stats.prompts} prompts · ${stats.responses} responses · ${stats.toolCalls} tool calls`;
+	const messages = `${stats.prompts} prompts · ${stats.responses} responses · ${stats.toolCalls} tool calls`;
 	// Legacy snapshots (pre-enrichment cards re-rendered from their stored
 	// snapshot) lack these fields; every read defaults instead of crashing.
 	const rows: StatRow[] = [{ label: "tokens", value: tokens }];
@@ -285,12 +305,14 @@ function statRows(stats: SessionStats): StatRow[] {
 	if (cache) rows.push({ label: "cache", value: cache });
 	const cost = formatCostTotal(stats.costTotal);
 	if (cost) rows.push({ label: "cost", value: cost });
-	rows.push({ label: "turns", value: turns });
+	rows.push({ label: "messages", value: messages });
 	const tools = formatToolBreakdown(stats.toolCalls, stats.toolFails, stats.toolCounts);
 	if (tools) rows.push({ label: "tools", value: tools });
 	const stops = formatStops(stats.stops);
 	if (stops) rows.push({ label: "stops", value: stops });
-	if (stats.durationMs != null) rows.push({ label: "time", value: formatDuration(stats.durationMs) });
+	const agent = formatAgentTiming(stats.agentDuration);
+	if (agent) rows.push({ label: "agent runtime", value: agent });
+	if (stats.durationMs != null) rows.push({ label: "total time", value: formatDuration(stats.durationMs) });
 	return rows;
 }
 
@@ -389,9 +411,9 @@ export class StatsView implements Component {
 	dispose(): void {}
 }
 
-const DESCRIPTION = "Show cumulative token, cache, turn, and time stats for the current branch";
+const DESCRIPTION = "Show current-branch stats and current-runtime Agent timing";
 
-export function installStats(pi: ExtensionAPI): void {
+export function installStats(pi: ExtensionAPI, getAgentDuration?: () => AgentDurationSnapshot): void {
 	let manager: StatsManager | undefined;
 
 	pi.on("session_start", (_event, ctx) => {
@@ -413,6 +435,8 @@ export function installStats(pi: ExtensionAPI): void {
 			let stats: SessionStats;
 			try {
 				stats = computeSessionStats(fallbackIfStale(() => manager?.getBranch() ?? [], []));
+				const agentDuration = getAgentDuration?.();
+				if (agentDuration && agentDuration.cycles > 0) stats = { ...stats, agentDuration };
 			} catch (error) {
 				if (isStaleExtensionError(error)) return;
 				throw error;

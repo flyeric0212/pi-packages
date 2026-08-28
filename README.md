@@ -34,12 +34,12 @@ Then start a new Pi session or run `/reload`.
 
 - **Header** — animated π logo (once per process), version, slogan, model, thinking effort, project directory
 - **Editor** — Codex-style filled input with a bold `❯`; history keeps the same marker; `!` flips it to the bash-mode color
-- **Footer** — one line: `model high · 126k/400k · cwd (main) · tok/s · CH87.3%`; other extensions' statuses render on the line above
+- **Footer** — one line: `model high · 126k/400k · cwd (main) · tok/s · CH87.3%`; other extensions' statuses render above
 
 **Interaction**
 
 - **`/clear` & `/cls`** — fill the viewport visually; session untouched
-- **`/stats`** — session card: token totals (↑↓R/W Σ), cache hit, turns, elapsed time
+- **`/stats`** — session card: token totals (↑↓R/W Σ), cache hit, turns, branch elapsed time, plus current-runtime Agent cycles with latest/average/total runtime
 - **Skill shortcuts** — `/name` runs a loaded skill (same as `/skill:name`); completion menus show short names
 - **Slash commands** — leading command painted in theme accent; Enter completes a partial pick and submits only on exact match
 

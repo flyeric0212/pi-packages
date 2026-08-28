@@ -4,6 +4,7 @@ import { installStats } from "./commands/stats.ts";
 import { installEditor, prefixUserPrompt } from "./editor/editor.ts";
 import { installFooter } from "./footer/footer.ts";
 import { installHeader } from "./header/header.ts";
+import { AgentDurationEngine, installAgentDuration } from "./metrics/agent-duration.ts";
 import { installSkillShortcuts } from "./commands/skill-shortcuts.ts";
 import { buildSkillCatalog, type SkillCatalog } from "./catalog.ts";
 import { CraftStore } from "./state.ts";
@@ -30,6 +31,7 @@ function sameDisplayedTps(a: TokenSpeedSnapshot, b: TokenSpeedSnapshot): boolean
 export default function (pi: ExtensionAPI): void {
 	const store = new CraftStore({ version: VERSION });
 	const tps = new TokenSpeedEngine();
+	const agentDuration = new AgentDurationEngine();
 	let installed = false;
 	let skillCatalog: SkillCatalog | undefined;
 
@@ -41,7 +43,8 @@ export default function (pi: ExtensionAPI): void {
 	const getSkillCatalog = (): SkillCatalog => skillCatalog ?? (skillCatalog = buildSkillCatalog(pi.getCommands()));
 
 	installClear(pi);
-	installStats(pi);
+	installStats(pi, () => agentDuration.snapshot());
+	installAgentDuration(pi, agentDuration);
 	installSkillShortcuts(pi, getSkillCatalog);
 
 	pi.registerMarkdownTransformer((markdown, { messageType }) => {

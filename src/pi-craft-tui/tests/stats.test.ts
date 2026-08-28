@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
 	computeSessionStats,
 	EMPTY_STATS,
+	formatAgentTiming,
 	formatCostTotal,
 	formatDuration,
 	formatReasoningShare,
@@ -186,6 +187,7 @@ describe("enriched facts", () => {
 
 describe("formatDuration", () => {
 	it("buckets into h/m/s without trailing zeros", () => {
+		assert.equal(formatDuration(900), "<1s");
 		assert.equal(formatDuration(59_000), "59s");
 		assert.equal(formatDuration(61_000), "1m 1s");
 		assert.equal(formatDuration(3 * 3600_000 + 2 * 60_000), "3h 2m");
@@ -194,6 +196,16 @@ describe("formatDuration", () => {
 });
 
 describe("row formatters", () => {
+	it("formats settled Agent cycles with last, average, and total time", () => {
+		assert.equal(formatAgentTiming(undefined), undefined);
+		assert.equal(formatAgentTiming({ lastMs: null, totalMs: 0, cycles: 0 }), undefined);
+		assert.equal(formatAgentTiming({ lastMs: Number.NaN, totalMs: 1, cycles: 1 }), undefined);
+		assert.equal(
+			formatAgentTiming({ lastMs: 61_000, totalMs: 181_000, cycles: 3 }),
+			"3 cycles · last 1m 1s · avg 1m 0s · total 3m 1s",
+		);
+	});
+
 	it("formats cost with adaptive precision and hides absence", () => {
 		assert.equal(formatCostTotal(null), undefined);
 		assert.equal(formatCostTotal(Number.NaN), undefined);
@@ -252,7 +264,7 @@ describe("formatStatsLines", () => {
 			assert.equal(lines.length, 3);
 			assert.match(lines[0]!, /^tokens:\s+↑12k ↓46k R0 W0 · Σ58k$/);
 			assert.ok(!lines.some((line) => line.startsWith("cache"))); // no cache read yet
-			assert.match(lines[2]!, /^time:\s+30m 0s$/);
+			assert.match(lines[2]!, /^total time:\s+30m 0s$/);
 		});
 
 		it("shows the cache row once a read exists, keeping Σ over all four buckets", () => {
@@ -269,8 +281,7 @@ describe("formatStatsLines", () => {
 	});
 
 	it("interleaves the enriched rows only when their facts exist", () => {
-		const lines = formatStatsLines(
-			computeSessionStats([
+		const stats = computeSessionStats([
 				assistantEntry({
 					usage: { input: 1000, output: 40_000, reasoning: 8200, cost: { total: 1.5 } },
 					content: [
@@ -280,16 +291,19 @@ describe("formatStatsLines", () => {
 					stopReason: "aborted",
 				}),
 				{ type: "message", message: { role: "toolResult", toolName: "read", isError: true } },
-			]),
-		);
+		]);
+		stats.agentDuration = { lastMs: 61_000, totalMs: 181_000, cycles: 3 };
+		const lines = formatStatsLines(stats);
 		assert.deepEqual(
 			lines.map((line) => line.slice(0, line.indexOf(":"))),
-			["tokens", "thinking", "cost", "turns", "tools", "stops"],
+			["tokens", "thinking", "cost", "messages", "tools", "stops", "agent runtime"],
 		);
 		assert.match(lines[1]!, /^thinking:\s+8\.2k \(21% of output\)$/);
 		assert.match(lines[2]!, /^cost:\s+\$1\.50$/);
+		assert.match(lines[3]!, /^messages:.+$/);
 		assert.match(lines[4]!, /^tools:\s+read 1 \(1\) · edit 1$/);
 		assert.match(lines[5]!, /^stops:\s+1 aborted$/);
+		assert.match(lines[6]!, /^agent runtime:\s+3 cycles · last 1m 1s · avg 1m 0s · total 3m 1s$/);
 		assert.ok(!lines.some((line) => line.startsWith("cache"))); // no cache read yet
 	});
 
@@ -311,7 +325,7 @@ describe("formatStatsLines", () => {
 		} as SessionStats);
 		assert.equal(lines.length, 2);
 		assert.match(lines[0]!, /^tokens:/);
-		assert.match(lines[1]!, /^turns:/);
+		assert.match(lines[1]!, /^messages:/);
 	});
 });
 

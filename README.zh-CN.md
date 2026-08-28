@@ -34,12 +34,12 @@ pi install /path/to/pi-packages/src/pi-auto-compact
 
 - **Header** —— 新进程播放一次 π logo 动画，展示版本、标语、模型、推理强度和项目目录
 - **Editor** —— Codex 风格填充输入框，粗体 `❯`；历史消息保留同一标记；`!` 开头切换 bash 模式配色
-- **Footer** —— 单行：`model high · 126k/400k · cwd (main) · tok/s · CH87.3%`；其他扩展的状态显示在上一行
+- **Footer** —— 单行：`model high · 126k/400k · cwd (main) · tok/s · CH87.3%`；其他扩展状态显示在上一行
 
 **交互**
 
 - **`/clear` 与 `/cls`** —— 仅视觉填满视口；不触碰会话
-- **`/stats`** —— 会话统计卡：token 汇总（↑↓R/W Σ）、缓存命中、轮次与时长
+- **`/stats`** —— 会话统计卡：token 汇总（↑↓R/W Σ）、缓存命中、分支时长，以及当前运行期内 Agent 执行周期数、最近/平均/累计耗时
 - **技能短命令** —— `/name` 运行已加载的 skill（等同 `/skill:name`）；补全菜单显示短名
 - **斜杠命令** —— 行首命令名用主题强调色；Enter 在部分匹配时只补全，打全了才提交
 

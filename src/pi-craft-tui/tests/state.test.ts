@@ -4,7 +4,7 @@ import { createState, CraftStore, sameCraftState } from "../state.ts";
 import { internLines, sameLines } from "../utils.ts";
 
 describe("CraftStore", () => {
-	it("does not notify when the displayed snapshot is unchanged", () => {
+	it("does not notify on duplicate displayed values", () => {
 		const store = new CraftStore({ cwd: "/tmp", version: "1" });
 		let renders = 0;
 		store.subscribe(() => {
