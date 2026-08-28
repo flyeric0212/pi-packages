@@ -39,7 +39,7 @@ pi install /path/to/pi-packages/src/pi-auto-compact
 **交互**
 
 - **`/clear` 与 `/cls`** —— 仅视觉填满视口；不触碰会话
-- **`/stats`** —— 会话统计卡：token 汇总（↑↓R/W Σ）、缓存命中、分支时长，以及当前运行期内 Agent 执行周期数、最近/平均/累计耗时
+- **`/stats`** —— 会话统计卡：token 汇总（↑↓R/W Σ）、缓存命中、花费、消息数（prompts/responses/tool calls）、工具明细、异常终止，以及 Agent 执行周期与分支总时长
 - **技能短命令** —— `/name` 运行已加载的 skill（等同 `/skill:name`）；补全菜单显示短名
 - **斜杠命令** —— 行首命令名用主题强调色；Enter 在部分匹配时只补全，打全了才提交
 
