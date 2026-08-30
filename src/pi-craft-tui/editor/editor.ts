@@ -6,6 +6,9 @@ import { colorizeLeadingCommand, recognizedLeadingCommand } from "./command-pain
 
 const RESET_BG = "\x1b[49m";
 const BORDER_GLYPH = "─";
+/** Scroll indicators (native Editor) start with three border glyphs and a space. */
+const SCROLL_BORDER_PREFIX = `${BORDER_GLYPH}${BORDER_GLYPH}${BORDER_GLYPH} `;
+const SGR_STRIP = /\x1b\[[0-9;?]*[ -/]*[@-~]/g;
 
 export { PROMPT_CHAR };
 
@@ -13,16 +16,30 @@ export function isBashInput(text: string): boolean {
 	return text.trimStart().startsWith("!");
 }
 
-const MARKDOWN_BLOCK_START = /^(```|~~~|# |>|[-*+] |\d+\.\s)/;
+const MARKDOWN_BLOCK_START = /^(```|~~~|# |>)/;
 
 /** Display-only prefix for historical user messages. Idempotent. */
 export function prefixUserPrompt(markdown: string, prompt = PROMPT_CHAR): string {
-	const text = markdown.replace(/^\uFEFF/, "");
+	// Leading blank lines in the message would put the prompt on an empty top
+	// row (input artifact of pressing Enter first); drop them before prefixing.
+	const text = markdown.replace(/^\uFEFF/, "").replace(/^\n+/, "");
 	const body = text.trimStart();
 	if (body.startsWith(prompt)) return markdown;
 	if (body.length === 0) return prompt;
+	// Fences, headings and blockquotes need column 0, so the prompt gets its
+	// own row above them (Codex look). Lists (`- `, `1. `) flow inline instead:
+	// an own-row prompt would leave a blank top line above the list.
 	if (MARKDOWN_BLOCK_START.test(body)) return `${prompt}\n\n${text}`;
-	return `${prompt} ${text}`;
+	const [first, ...rest] = text.split("\n");
+	if (rest.length === 0) return `${prompt} ${text}`;
+	// Continuation lines of plain text align under the text after the prompt
+	// glyph (Codex look), mirroring the input box's wrapped rows. Markdown
+	// block starts and blank lines stay flush so rendering is unaffected.
+	const indent = " ".repeat(visibleWidth(prompt) + 1);
+	const aligned = rest
+		.map((line) => (line.trim().length === 0 || MARKDOWN_BLOCK_START.test(line) ? line : indent + line))
+		.join("\n");
+	return `${prompt} ${first}\n${aligned}`;
 }
 
 export type EditorChromeLayout = {
@@ -30,12 +47,24 @@ export type EditorChromeLayout = {
 	bottomIndex: number;
 };
 
+/**
+ * A row is editor chrome if it is a border (`─` only, full width) or a scroll
+ * indicator (`─── ↑ N more …`). Content rows are always indented by the
+ * prompt gutter, so typed box-drawing never matches. Autocomplete rows below
+ * the frame can contain `─` in their text; treating them as chrome would
+ * strip their glyphs and mis-fill the background (AGENTS rules 1–2).
+ */
+function isChromeRow(line: string): boolean {
+	const plain = line.replace(SGR_STRIP, "");
+	return plain.startsWith(SCROLL_BORDER_PREFIX) || (plain.length > 0 && !/[^─]/.test(plain));
+}
+
 /** Locate the Codex panel. Missing chrome (no bottom border) means leave Pi's lines alone. */
 export function inspectEditorChrome(lines: readonly string[]): EditorChromeLayout | undefined {
 	if (lines.length < 2) return undefined;
 	let bottom = -1;
 	for (let i = lines.length - 1; i >= 0; i--) {
-		if (lines[i]?.includes(BORDER_GLYPH)) {
+		if (isChromeRow(lines[i] ?? "")) {
 			bottom = i;
 			break;
 		}
@@ -134,6 +163,10 @@ export function paintCraftEditor(lines: readonly string[], paint: CraftEditorPai
 	if (!layout) return lines.map((line) => truncateToWidth(line, paint.width, ""));
 
 	const next = lines.slice();
+	// When the frame is scrolled, the top border is `─── ↑ N more …` and the
+	// first content row is a mid-message line; the prompt belongs to the first
+	// (scrolled-off) line and must not be pinned here (Codex behavior).
+	const scrolled = lines[0]?.includes("↑") ?? false;
 	if (paint.command) {
 		next[layout.contentIndex] = colorizeLeadingCommand(
 			next[layout.contentIndex] ?? "",
@@ -142,7 +175,9 @@ export function paintCraftEditor(lines: readonly string[], paint: CraftEditorPai
 			FG_RESET,
 		);
 	}
-	next[layout.contentIndex] = insertPrompt(next[layout.contentIndex] ?? "", paint.prompt);
+	if (!scrolled) {
+		next[layout.contentIndex] = insertPrompt(next[layout.contentIndex] ?? "", paint.prompt);
+	}
 	for (let i = 0; i <= layout.bottomIndex; i++) {
 		const line = next[i] ?? "";
 		const stripped = i === 0 || i === layout.bottomIndex ? replaceBorderGlyphs(line) : line;

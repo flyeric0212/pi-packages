@@ -45,6 +45,34 @@ describe("CraftEditor layout helpers", () => {
 		assert.equal(prefixUserPrompt(""), "❯");
 	});
 
+	it("aligns multiline historical text under the prompt column", () => {
+		// Continuation lines indent under the text after `❯ ` — same column as
+		// the input box's wrapped rows (prompt col 1, text col 3).
+		assert.equal(prefixUserPrompt("line1\nline2"), "❯ line1\n  line2");
+		assert.equal(prefixUserPrompt("a\n\nb"), "❯ a\n\n  b");
+		assert.equal(prefixUserPrompt("a\n\n\nb"), "❯ a\n\n\n  b");
+	});
+
+	it("keeps markdown block starts flush in multiline historical text", () => {
+		assert.equal(prefixUserPrompt("line1\n- item\nline3"), "❯ line1\n  - item\n  line3");
+		assert.equal(prefixUserPrompt("line1\n# heading"), "❯ line1\n# heading");
+		assert.equal(prefixUserPrompt("line1\n> quote"), "❯ line1\n> quote");
+	});
+
+	it("flows list messages inline so no blank row opens above them", () => {
+		assert.equal(prefixUserPrompt("1. 测试第一条\n2. 测试第二条"), "❯ 1. 测试第一条\n  2. 测试第二条");
+		assert.equal(prefixUserPrompt("- a\n- b"), "❯ - a\n  - b");
+		assert.equal(prefixUserPrompt("1. 测试第一条"), "❯ 1. 测试第一条");
+		assert.equal(prefixUserPrompt("1. a\n\n2. b"), "❯ 1. a\n\n  2. b");
+	});
+
+	it("drops leading blank lines so the prompt sits on the first real line", () => {
+		assert.equal(prefixUserPrompt("\n这条是测试，为了凑齐两行"), "❯ 这条是测试，为了凑齐两行");
+		assert.equal(prefixUserPrompt("\n\na\n\nb"), "❯ a\n\n  b");
+		assert.equal(prefixUserPrompt("\n\n```ts\nx\n```"), "❯\n\n```ts\nx\n```");
+		assert.equal(prefixUserPrompt("\n\n"), "❯");
+	});
+
 	it("keeps one column of left padding and aligns content with gutter", () => {
 		assert.equal(insertPrompt("   hello", "❯"), " ❯ hello");
 	});
@@ -205,6 +233,52 @@ describe("editor chrome probe", () => {
 		assert.equal(painted[2], "   ────");
 		assert.ok(!painted[3]!.includes("─"));
 		assert.equal(painted[4], "/clear");
+	});
+
+	it("does not pin the prompt mid-message when the frame is scrolled", () => {
+		const scrolled = ["─── ↑ 8 more ────────────", "   line five content", "   here", "   line six content", "─── ↓ 1 more ────────────"];
+		const painted = paintCraftEditor(scrolled, {
+			width: 25,
+			text: "line five content\nhere\nline six content",
+			bg: "",
+			prompt: "❯",
+			accent: "",
+		});
+		assert.equal(painted[1], "   line five content");
+		assert.ok(!painted[1]!.includes("❯"));
+		// Chrome is still stripped and the scroll indicators survive.
+		assert.ok(!painted[0]!.includes("─"));
+		assert.match(painted[0]!, /↑ 8 more/);
+		assert.match(painted[4]!, /↓ 1 more/);
+	});
+
+	it("adds the prompt on an unscrolled frame even with ▼ below", () => {
+		const frame = ["────────", "   hello", "─── ↓ 3 more ────────"];
+		const painted = paintCraftEditor(frame, {
+			width: 25,
+			text: "hello",
+			bg: "",
+			prompt: "❯",
+			accent: "",
+		});
+		assert.match(painted[1]!, /❯ hello/);
+	});
+
+	it("ignores autocomplete rows that contain ─ when probing the bottom border", () => {
+		const frame = ["────────", "   hello", "────────", "   /clear ─ session", "   item"];
+		assert.deepEqual(inspectEditorChrome(frame), { contentIndex: 1, bottomIndex: 2 });
+		const painted = paintCraftEditor(frame, {
+			width: 20,
+			text: "hello",
+			bg: "",
+			prompt: "❯",
+			accent: "",
+		});
+		assert.match(painted[1]!, /❯ hello/);
+		assert.ok(!painted[2]!.includes("─"));
+		// Autocomplete rows below the border keep their box-drawing glyphs.
+		assert.equal(painted[3], "   /clear ─ session");
+		assert.equal(painted[4], "   item");
 	});
 
 	it("still fills content rows after leaving content glyphs alone", () => {
