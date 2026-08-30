@@ -8,7 +8,6 @@
 
 - **`pi-craft-tui`** (`src/pi-craft-tui`) —— Claude Code 风格 Header、Codex 风格输入区与单行 Footer 状态栏。
 - **`pi-simple-permission`** (`src/pi-simple-permission`) —— 轻量权限拦截与守护扩展。
-- **`pi-auto-compact`** (`src/pi-auto-compact`) —— 原生优先的上下文压缩扩展，支持按自然结束后的窗口百分比提前压缩。
 
 ## 安装
 
@@ -21,7 +20,6 @@ git clone https://github.com/flyeric0212/pi-packages.git /path/to/pi-packages
 # 2. 安装扩展
 pi install /path/to/pi-packages/src/pi-craft-tui
 pi install /path/to/pi-packages/src/pi-simple-permission
-pi install /path/to/pi-packages/src/pi-auto-compact
 ```
 
 然后新开一个 Pi 会话，或执行 `/reload`。
@@ -82,43 +80,6 @@ pi install /path/to/pi-packages/src/pi-auto-compact
 ```
 
 同一分类中后写的具体规则优先，`"*"` 始终只是兜底。项目配置仅在 Pi 信任该项目后加载。该扩展是轻量防误操作规则器，不是完整 Shell 解析器或沙箱；路径规则只覆盖直接文件工具，Bash 和符号链接仍需依赖独立沙箱保护。
-
-## pi-auto-compact 功能介绍
-
-适用于 Pi 0.84.4+ 的原生优先上下文预算扩展。插件不再打断任何正在执行的 Agent run。
-
-- **原生接管活跃回合** —— Pi 在工具执行后、下一次 Assistant 响应前完成 threshold/overflow 压缩，并用重建后的上下文在同一 run 内继续。
-- **自然结束后提前压缩** —— 仅在 `agent_settled` 后按模型窗口百分比（默认 80%）提前压缩，为下一项用户任务释放空间。
-- **安全守卫** —— aborted/error/length 结束不压缩；调用公共压缩 API 前再次检查 `ctx.isIdle()` 与待处理消息。
-- **固定质量指令** —— 在 Pi 原生结构化摘要上追加精简且不可配置的聚焦要求，确保目标、未完成文件、决策、下一步及文件清单完整。
-- **失败安全降级** —— 使用官方压缩结果事件；插件触发失败一次后，本会话不再主动尝试，Pi 原生恢复流程仍保持启用。
-- **仅一个配置项** —— 只保留 `triggerPercent`，在每次 session 启动时从全局配置和可选的受信任项目覆盖中读取一次。
-
-### 配置文件示例 (`config.json`)
-
-```json
-{
-  "autoCompact": {
-    "triggerPercent": 80
-  }
-}
-```
-
-`triggerPercent` 范围为 50～95，默认 80。配置仅在 session 启动时读取，修改后执行 `/reload`。其它旧扩展字段会被忽略；如需禁用，请通过 Pi 的 package 配置关闭插件，不再维护第二套启用开关。
-
-如果希望在**活跃 run** 中也按预算线无缝压缩，应直接配置 Pi 原生能力。例如 272k 窗口约在 80% 触发时，可设置 `reserveTokens: 54400`：
-
-```json
-{
-  "compaction": {
-    "enabled": true,
-    "reserveTokens": 54400,
-    "keepRecentTokens": 20000
-  }
-}
-```
-
-`reserveTokens` 是绝对 Token 数，切换不同窗口模型时需要复核。本扩展刻意不读写 Pi settings。
 
 ## 设计原则
 

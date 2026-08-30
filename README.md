@@ -8,7 +8,6 @@ A modular collection of extensions for [Pi](https://pi.dev/).
 
 - **`pi-craft-tui`** (`src/pi-craft-tui`) — Claude Code-style header, Codex-style input, and a single-line metrics footer.
 - **`pi-simple-permission`** (`src/pi-simple-permission`) — Lightweight permission guard extension for Pi.
-- **`pi-auto-compact`** (`src/pi-auto-compact`) — Native-first context compaction with a configurable settled-run budget threshold.
 
 ## Install
 
@@ -21,7 +20,6 @@ git clone https://github.com/flyeric0212/pi-packages.git /path/to/pi-packages
 # 2. Install extensions
 pi install /path/to/pi-packages/src/pi-craft-tui
 pi install /path/to/pi-packages/src/pi-simple-permission
-pi install /path/to/pi-packages/src/pi-auto-compact
 ```
 
 Then start a new Pi session or run `/reload`.
@@ -82,43 +80,6 @@ A lightweight, deterministic, and transparent permission guard for Pi. Eliminate
 ```
 
 Later specific rules win within a category, while exact `"*"` is always the fallback. Project policy is loaded only after Pi trusts the project. This extension is a lightweight accident-prevention policy, not a complete shell parser or sandbox; path rules cover direct file tools, while Bash and symlink isolation require a separate sandbox.
-
-## pi-auto-compact Features
-
-Native-first context budget companion for Pi 0.84.4+. Active runs are never interrupted by this extension.
-
-- **Native Mid-Run Ownership** — Pi handles threshold/overflow compaction between tool execution and the next assistant response, then continues the same run with rebuilt context.
-- **Settled-Run Budget Threshold** — After `agent_settled`, the extension can compact early at a model-relative percentage (80% by default), before the next user task.
-- **Abort-Safe Guards** — Skips aborted, failed, or length-limited runs and rechecks `ctx.isIdle()` plus pending messages before calling the public compaction API.
-- **Fixed Quality Guidance** — Adds a small, non-configurable focus instruction to Pi's native structured summary so goals, unfinished files, decisions, next steps, and file lists remain complete.
-- **Fail-Safe Degradation** — Uses official compaction outcome events and disables extension-triggered attempts after the first failure for the session; Pi native recovery remains active.
-- **One Setting** — Only `triggerPercent` is configurable. It is loaded once per session from the global file and optional trusted-project override.
-
-### Configuration Example (`config.json`)
-
-```json
-{
-  "autoCompact": {
-    "triggerPercent": 80
-  }
-}
-```
-
-`triggerPercent` accepts 50–95 and defaults to 80. Configuration is read once on session start; run `/reload` after changing it. Other legacy extension fields are ignored. Disable the package through Pi's package configuration instead of maintaining a second enable switch.
-
-For seamless **active-run** compaction near a chosen budget, configure Pi itself. For example, a 272k model reaches roughly 80% when `reserveTokens` is `54400`:
-
-```json
-{
-  "compaction": {
-    "enabled": true,
-    "reserveTokens": 54400,
-    "keepRecentTokens": 20000
-  }
-}
-```
-
-`reserveTokens` is an absolute value, so review it when switching context-window sizes. The extension deliberately does not read or write Pi settings.
 
 ## Principles
 

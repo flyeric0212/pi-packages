@@ -5,8 +5,7 @@
   "type": "module",
   "workspaces": [
     "src/pi-craft-tui",
-    "src/pi-simple-permission",
-    "src/pi-auto-compact"
+    "src/pi-simple-permission"
   ],
   "scripts": {
     "test": "node --experimental-strip-types --test src/**/tests/*.test.ts",
