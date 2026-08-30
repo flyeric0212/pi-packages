@@ -1,11 +1,5 @@
 {
   "autoCompact": {
-    "enabled": true,
-    "triggerPercent": 80,
-    "debounceTokens": 20000,
-    "interruptTurn": true,
-    "notifyOnly": false,
-    "customInstructions": "Focus the summary on: 1) the current task goal and acceptance criteria; 2) unfinished changes with their exact file paths; 3) key decisions made and the rationale behind them; 4) concrete next steps. Keep <read-files>/<modified-files> complete and accurate. The summary body language may follow the conversation language.",
-    "lang": "zh"
+    "triggerPercent": 80
   }
 }

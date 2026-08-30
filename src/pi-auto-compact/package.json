@@ -1,7 +1,7 @@
 {
   "name": "pi-auto-compact",
   "version": "0.1.0",
-  "description": "Auto-compact Pi context at a configurable percentage, auto-resume the task, and keep summaries quality-first",
+  "description": "Minimal native-first Pi compaction with one configurable settled-run percentage",
   "type": "module",
   "license": "MIT",
   "keywords": [
@@ -18,6 +18,6 @@
     ]
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": ">=0.84.2"
+    "@earendil-works/pi-coding-agent": ">=0.84.4"
   }
 }

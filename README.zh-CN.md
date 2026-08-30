@@ -8,7 +8,7 @@
 
 - **`pi-craft-tui`** (`src/pi-craft-tui`) —— Claude Code 风格 Header、Codex 风格输入区与单行 Footer 状态栏。
 - **`pi-simple-permission`** (`src/pi-simple-permission`) —— 轻量权限拦截与守护扩展。
-- **`pi-auto-compact`** (`src/pi-auto-compact`) —— 上下文自动压缩扩展，支持真实 Token 压力评估、回合中拦截与自动续跑。
+- **`pi-auto-compact`** (`src/pi-auto-compact`) —— 原生优先的上下文压缩扩展，支持按自然结束后的窗口百分比提前压缩。
 
 ## 安装
 
@@ -85,31 +85,40 @@ pi install /path/to/pi-packages/src/pi-auto-compact
 
 ## pi-auto-compact 功能介绍
 
-适用于 Pi 的上下文自动压缩扩展，用于控制上下文增长，解决多工具调用的长链路回合（马拉松回合）中上下文暴涨与 Token 成本翻倍问题。
+适用于 Pi 0.84.4+ 的原生优先上下文预算扩展。插件不再打断任何正在执行的 Agent run。
 
-- **真实上下文压力计算** —— 优先使用原生 `totalTokens`，否则按 `input + output + cacheRead + cacheWrite` 计算，完整覆盖缓存命中与 Assistant 输出。
-- **回合中打断与回合间触发** —— `interruptTurn` 开启时通过 `message_end` 拦截马拉松工具链，关闭时仅在 `agent_end` 触发。
-- **压缩后自动续跑** —— 压缩完成后自动注入引导指令，让模型基于摘要无感接续执行当前任务，无需人工手动发消息继续。
-- **多层防抖与熔断保护** —— 包含增长防抖、失败降级（回落前 disarm）与连续 3 次失败熔断，同时保留 Pi 原生 overflow recovery。
-- **分层 JSON 配置与热加载** —— 支持全局配置（`~/.pi/agent/extensions/pi-auto-compact/config.json`）与受信任项目配置（`.pi/pi-auto-compact.json`），支持字段级容错与基于 `mtime` 的热更新。
+- **原生接管活跃回合** —— Pi 在工具执行后、下一次 Assistant 响应前完成 threshold/overflow 压缩，并用重建后的上下文在同一 run 内继续。
+- **自然结束后提前压缩** —— 仅在 `agent_settled` 后按模型窗口百分比（默认 80%）提前压缩，为下一项用户任务释放空间。
+- **安全守卫** —— aborted/error/length 结束不压缩；调用公共压缩 API 前再次检查 `ctx.isIdle()` 与待处理消息。
+- **固定质量指令** —— 在 Pi 原生结构化摘要上追加精简且不可配置的聚焦要求，确保目标、未完成文件、决策、下一步及文件清单完整。
+- **失败安全降级** —— 使用官方压缩结果事件；插件触发失败一次后，本会话不再主动尝试，Pi 原生恢复流程仍保持启用。
+- **仅一个配置项** —— 只保留 `triggerPercent`，在每次 session 启动时从全局配置和可选的受信任项目覆盖中读取一次。
 
 ### 配置文件示例 (`config.json`)
 
 ```json
 {
   "autoCompact": {
-    "enabled": true,
-    "triggerPercent": 80,
-    "debounceTokens": 20000,
-    "interruptTurn": true,
-    "notifyOnly": false,
-    "customInstructions": "Focus the summary on: 1) the current task goal and acceptance criteria; 2) unfinished changes with their exact file paths; 3) key decisions made and the rationale behind them; 4) concrete next steps. Keep <read-files>/<modified-files> complete and accurate. The summary body language may follow the conversation language.",
-    "lang": "zh"
+    "triggerPercent": 80
   }
 }
 ```
 
-只需配置需要修改的字段，未声明字段使用默认值。Pi 原生 threshold 压缩始终作为安全兜底，仅在本扩展自己的压缩正在进行时取消；overflow recovery 与手动 `/compact` 保持不变。
+`triggerPercent` 范围为 50～95，默认 80。配置仅在 session 启动时读取，修改后执行 `/reload`。其它旧扩展字段会被忽略；如需禁用，请通过 Pi 的 package 配置关闭插件，不再维护第二套启用开关。
+
+如果希望在**活跃 run** 中也按预算线无缝压缩，应直接配置 Pi 原生能力。例如 272k 窗口约在 80% 触发时，可设置 `reserveTokens: 54400`：
+
+```json
+{
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 54400,
+    "keepRecentTokens": 20000
+  }
+}
+```
+
+`reserveTokens` 是绝对 Token 数，切换不同窗口模型时需要复核。本扩展刻意不读写 Pi settings。
 
 ## 设计原则
 
